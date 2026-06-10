@@ -1,12 +1,12 @@
 {
   "name": "llm-wiki-skills",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Graph-first CLI and skill package for maintaining Obsidian-compatible LLM wiki vaults.",
   "type": "module",
   "license": "MIT",
   "author": "wei",
   "bin": {
-    "llm-wiki-skills": "./bin/llm-wiki-skills"
+    "llm-wiki-skills": "bin/llm-wiki-skills"
   },
   "files": [
     "dist",
