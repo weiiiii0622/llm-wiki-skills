@@ -1,0 +1,45 @@
+{
+  "name": "llm-wiki-skills",
+  "version": "0.1.0",
+  "description": "Graph-first CLI and skill package for maintaining Obsidian-compatible LLM wiki vaults.",
+  "type": "module",
+  "license": "MIT",
+  "author": "wei",
+  "bin": {
+    "llm-wiki-skills": "./bin/llm-wiki-skills"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "fixtures/demo-vault",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && vitest run",
+    "pack:dry-run": "npm run build && npm pack --dry-run --cache .tmp/npm-cache",
+    "smoke": "npm run build && node -e \"fs.rmSync('.tmp/smoke', { recursive: true, force: true })\" && node bin/llm-wiki-skills init --root .tmp/smoke --quiet && node bin/llm-wiki-skills health --root .tmp/smoke --json",
+    "prepack": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.0",
+    "vitest": "^4.1.8"
+  },
+  "keywords": [
+    "llm",
+    "wiki",
+    "obsidian",
+    "codex",
+    "claude",
+    "knowledge-graph"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wei/llm-wiki-skills.git"
+  }
+}
