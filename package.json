@@ -1,6 +1,6 @@
 {
   "name": "llm-wiki-skills",
-  "version": "0.1.2",
+  "version": "0.1.1",
   "description": "Local-first CLI for installing host-specific LLM wiki skills.",
   "type": "module",
   "license": "MIT",
