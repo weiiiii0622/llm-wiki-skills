@@ -1,7 +1,7 @@
 {
   "name": "llm-wiki-skills",
-  "version": "0.1.6",
-  "description": "Graph-first CLI and skill package for maintaining Obsidian-compatible LLM wiki vaults.",
+  "version": "0.1.2",
+  "description": "Local-first CLI for installing host-specific LLM wiki skills.",
   "type": "module",
   "license": "MIT",
   "author": "weiiiii0622",
@@ -22,7 +22,7 @@
     "build": "tsc -p tsconfig.json",
     "test": "npm run build && vitest run",
     "pack:dry-run": "npm run build && npm pack --dry-run --cache .tmp/npm-cache",
-    "smoke": "npm run build && node -e \"fs.rmSync('.tmp/smoke', { recursive: true, force: true })\" && node bin/llm-wiki-skills init --root .tmp/smoke --quiet && node bin/llm-wiki-skills health --root .tmp/smoke --json",
+    "smoke": "npm run build && node -e \"fs.rmSync('.tmp/smoke', { recursive: true, force: true })\" && node bin/llm-wiki-skills init --root .tmp/smoke --host codex --quiet && node bin/llm-wiki-skills status --root .tmp/smoke --json",
     "prepack": "npm run build"
   },
   "devDependencies": {
@@ -36,7 +36,7 @@
     "obsidian",
     "codex",
     "claude",
-    "knowledge-graph"
+    "skills"
   ],
   "repository": {
     "type": "git",

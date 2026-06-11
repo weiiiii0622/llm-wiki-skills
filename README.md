@@ -1,171 +1,73 @@
 # llm-wiki-skills
 
-Graph-first CLI and skill package for maintaining persistent, Obsidian-compatible LLM wiki vaults.
+Local-first CLI for installing host-specific LLM wiki skills into a project or markdown vault.
 
 ## Quickstart
 
-```sh
-npx llm-wiki-skills init
-```
-
-The first run creates the default vault contract:
-
-```text
-raw/
-wiki/
-  graph.json
-  graph.md
-docs/
-tools/
-AGENTS.md
-CLAUDE.md
-.codex/skills/llm-wiki/SKILL.md
-.claude/skills/llm-wiki/SKILL.md
-```
-
-## Installation
-
-You can run the package without installing it globally:
+Install Codex skills into the current directory:
 
 ```sh
-npx llm-wiki-skills init
+npx llm-wiki-skills init --host codex
 ```
 
-To install the CLI globally:
+Install Claude Code skills instead:
 
 ```sh
-npm install -g llm-wiki-skills
-llm-wiki-skills init
+npx llm-wiki-skills init --host claude-code
 ```
 
-To install it in a project and run it through npm:
+Install both hosts:
 
 ```sh
-npm install --save-dev llm-wiki-skills
-npx llm-wiki-skills init --root .
+npx llm-wiki-skills init --host codex,claude-code
 ```
 
-Requirements:
+Check the installed contract:
 
-- Node.js 20 or newer.
-- A markdown vault or project directory where the command can create `raw/`, `wiki/`, `docs/`, and agent skill files.
+```sh
+npx llm-wiki-skills status
+```
 
 ## Commands
 
 ```sh
-llm-wiki-skills init
-llm-wiki-skills health
-llm-wiki-skills lint
-llm-wiki-skills graph
+llm-wiki-skills init [--root DIR] [--host codex|claude-code] [--json] [--quiet]
+llm-wiki-skills status [--root DIR] [--json] [--quiet]
 ```
 
-All commands support `--root DIR`, `--json`, `--quiet`, and `--debug`. `graph` also supports `--check`.
+`init` creates local wiki starter files, shared workflow references, host-specific skills, and a `.llm-wiki-skills.json` manifest. If `--host` is omitted in a terminal, the CLI opens a small selector. In non-TTY environments, pass `--host`.
 
-These are deterministic maintenance commands. They do not call an LLM and they do not perform semantic ingest or question answering by themselves.
+`status` reads `.llm-wiki-skills.json` and verifies that the required files for the selected hosts still exist.
+
+## Generated Files
+
+```text
+.llm-wiki-skills.json
+docs/
+  llm-wiki-contract.md
+  llm-wiki-workflows.md
+.codex/skills/llm-wiki-ingest/SKILL.md
+.codex/skills/llm-wiki-query/SKILL.md
+.codex/skills/llm-wiki-lint/SKILL.md
+.claude/skills/llm-wiki-ingest/SKILL.md
+.claude/skills/llm-wiki-query/SKILL.md
+.claude/skills/llm-wiki-lint/SKILL.md
+```
+
+Only selected host files are generated. Existing user-edited files are skipped on rerun.
 
 ## Agent Workflows
 
-`init` installs Codex and Claude skill instructions into the target vault:
+The generated host skills cover three local workflows:
+
+- `llm-wiki-ingest`: add source material and update durable wiki pages.
+- `llm-wiki-query`: answer questions from the local wiki with page citations.
+- `llm-wiki-lint`: review local wiki edits before handoff.
+
+Example request after init:
 
 ```text
-.codex/skills/llm-wiki/SKILL.md
-.claude/skills/llm-wiki/SKILL.md
-```
-
-Use those with an agent for the semantic workflows:
-
-```text
-wiki-ingest: add source material, create source pages, update overlapping topic pages, update index/log, regenerate graph, lint.
-wiki-query: answer from wiki pages, cite sources, optionally file durable answers under wiki/questions/, regenerate graph, lint.
-```
-
-Example agent request after `npx llm-wiki-skills init`:
-
-```text
-Use the llm-wiki skill. Ingest raw/sources/interview-notes.md into the wiki, update any overlapping topic pages, then run graph and lint.
-```
-
-Example query request:
-
-```text
-Use the llm-wiki skill. Answer "What do we know about graph-first vault maintenance?" from this vault and cite the wiki pages you used.
-```
-
-## Example Usage
-
-Create a new vault:
-
-```sh
-npx llm-wiki-skills init --root my-wiki
-```
-
-Example output:
-
-```text
-Initialized llm-wiki vault.
-Created: 14
-Skipped existing files: 0
-Next: run `llm-wiki-skills health`.
-```
-
-Check the vault:
-
-```sh
-npx llm-wiki-skills health --root my-wiki --json
-```
-
-Example output, with the absolute path shortened:
-
-```json
-{
-  "status": "pass",
-  "root": "/path/to/my-wiki",
-  "pageCount": 8,
-  "countsByType": {
-    "index": 1,
-    "log": 1,
-    "overview": 1,
-    "template": 5
-  },
-  "countsByStatus": {
-    "draft": 6,
-    "reviewed": 2
-  },
-  "orphanPages": [],
-  "issues": []
-}
-```
-
-Regenerate graph sidecars after an agent edits wiki pages:
-
-```sh
-npx llm-wiki-skills graph --root my-wiki
-```
-
-Example output:
-
-```text
-Graph written.
-Nodes: 0
-Edges: 0
-```
-
-Then ask your coding agent to use the installed skill for semantic work:
-
-```text
-Use the llm-wiki skill. Ingest raw/sources/interview-notes.md into the wiki, update overlapping topic pages, then run graph and lint.
-```
-
-## Graph Sidecars
-
-`wiki/graph.json` is the canonical machine-readable graph. `wiki/graph.md` is the generated human-readable report. Page markdown stays clean and uses ordinary Obsidian wikilinks.
-
-Graph metadata:
-
-```yaml
-llmWikiGraphVersion: 1
-createdBy: llm-wiki-skills@0.1.0
-scoringRubricVersion: 1
+Use the llm-wiki-ingest skill. Ingest raw/sources/interview-notes.md into the wiki and update overlapping pages.
 ```
 
 ## Development
@@ -177,4 +79,4 @@ npm run pack:dry-run
 npm run smoke
 ```
 
-Release checks run build, tests, `npm pack --dry-run`, and npm provenance publishing from GitHub Actions.
+TODO: design global install behavior separately. The current package intentionally installs skills into a local project or vault.

@@ -13,10 +13,7 @@ export const REQUIRED_DIRECTORIES = [
   "wiki/concepts",
   "wiki/questions",
   "wiki/templates",
-  "docs",
-  "tools/ingest",
-  "tools/lint",
-  "tools/search"
+  "docs"
 ] as const;
 
 export async function assertVault(root: string): Promise<void> {
@@ -39,6 +36,18 @@ export async function createStarterFiles(root: string): Promise<Record<string, "
     results[relativePath] = await writeTextIfAbsent(root, relativePath, content, relativePath.startsWith("raw/"));
   }
   return results;
+}
+
+export async function createSharedReferenceFiles(root: string): Promise<Record<string, "created" | "skipped">> {
+  const results: Record<string, "created" | "skipped"> = {};
+  for (const [relativePath, content] of Object.entries(sharedReferenceFiles())) {
+    results[relativePath] = await writeTextIfAbsent(root, relativePath, content);
+  }
+  return results;
+}
+
+export function sharedReferenceFilePaths(): string[] {
+  return Object.keys(sharedReferenceFiles());
 }
 
 function starterFiles(): Record<string, string> {
@@ -101,17 +110,55 @@ Ingest a source to create the first source and topic pages.
     "wiki/templates/topic.md": template("topic", today),
     "wiki/templates/entity.md": template("entity", today),
     "wiki/templates/concept.md": template("concept", today),
-    "wiki/templates/question.md": template("question", today),
-    "docs/tools-and-skills.md": `# Tools and Skills
+    "wiki/templates/question.md": template("question", today)
+  };
+}
 
-Use \`llm-wiki-skills init\` to create the vault contract, \`llm-wiki-skills graph\` to regenerate graph sidecars, \`llm-wiki-skills lint\` for hard failures, and \`llm-wiki-skills health\` for a vault summary.
+function sharedReferenceFiles(): Record<string, string> {
+  return {
+    "docs/llm-wiki-contract.md": `# LLM Wiki Contract
+
+This repository is a local-first LLM wiki vault.
+
+## Directories
+
+- \`raw/\` stores preserved source evidence and notes.
+- \`wiki/\` stores durable synthesis as markdown pages.
+- \`wiki/sources/\` summarizes individual source units.
+- \`wiki/topics/\`, \`wiki/entities/\`, \`wiki/concepts/\`, and \`wiki/questions/\` store reusable knowledge pages.
+- \`docs/\` stores vault operating references.
+
+## Page Rules
+
+- Wiki pages use YAML frontmatter.
+- Pages stay source-grounded and link back to source pages.
+- Obsidian wikilinks are allowed for relationships between wiki pages.
+- Existing synthesis should be updated before creating duplicate pages.
 `,
-    "docs/maintenance-checklist.md": `# Maintenance Checklist
+    "docs/llm-wiki-workflows.md": `# LLM Wiki Workflows
 
-- Preserve files under \`raw/\` unless the user explicitly asks for source cleanup.
-- Update existing topic pages when new source material overlaps.
-- Run \`llm-wiki-skills graph\` after page edits.
-- Run \`llm-wiki-skills lint\` before sharing durable results.
+## Ingest
+
+1. Preserve source material under \`raw/sources/\` or \`raw/notes/\` when needed.
+2. Create source summaries under \`wiki/sources/\`.
+3. Search existing synthesis before adding new pages.
+4. Update overlapping topic, entity, concept, or question pages.
+5. Update \`wiki/index.md\` and \`wiki/log.md\`.
+
+## Query
+
+1. Read \`wiki/index.md\`.
+2. Search \`wiki/\` for relevant source and synthesis pages.
+3. Read source pages before relying on claims.
+4. Answer with citations to wiki page paths.
+5. Save answers under \`wiki/questions/\` only when durable storage is requested.
+
+## Lint
+
+1. Check frontmatter and required metadata.
+2. Confirm wikilinks point to intended pages.
+3. Confirm new claims cite source pages.
+4. Confirm raw evidence was not changed without explicit user direction.
 `
   };
 }

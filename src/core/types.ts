@@ -5,6 +5,29 @@ export interface CommandOptions {
   json: boolean;
   debug: boolean;
   quiet: boolean;
+  hosts: HostId[];
+}
+
+export type HostId = "codex" | "claude-code";
+
+export interface HostSkill {
+  name: "llm-wiki-ingest" | "llm-wiki-query" | "llm-wiki-lint";
+  content: string;
+}
+
+export interface HostAdapter {
+  id: HostId;
+  label: string;
+  skillRoot: string;
+  skills: HostSkill[];
+}
+
+export interface Manifest {
+  manifestVersion: 1;
+  createdBy: "llm-wiki-skills";
+  hosts: HostId[];
+  directories: string[];
+  files: string[];
 }
 
 export interface WikiPage {
@@ -70,4 +93,15 @@ export interface HealthReport {
   countsByStatus: Record<string, number>;
   orphanPages: string[];
   issues: ValidationIssue[];
+}
+
+export interface StatusReport {
+  status: "pass" | "fail";
+  root: string;
+  manifestPath: string;
+  hosts: HostId[];
+  checkedFiles: string[];
+  missingFiles: string[];
+  extraManifestFiles: string[];
+  missingManifestFiles: string[];
 }

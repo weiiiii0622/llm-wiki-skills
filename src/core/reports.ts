@@ -1,9 +1,20 @@
-import type { HealthReport, ValidationIssue, WikiGraph, WikiPage } from "./types.js";
+import type { HealthReport, StatusReport, ValidationIssue, WikiGraph, WikiPage } from "./types.js";
 
 export function renderInitReport(results: Record<string, "created" | "skipped">): string {
   const created = Object.entries(results).filter(([, status]) => status === "created").length;
   const skipped = Object.entries(results).filter(([, status]) => status === "skipped").length;
-  return `Initialized llm-wiki vault.\nCreated: ${created}\nSkipped existing files: ${skipped}\nNext: run \`llm-wiki-skills health\`.\n`;
+  return `Initialized llm-wiki local skills.\nCreated: ${created}\nSkipped existing files: ${skipped}\nNext: run \`npx llm-wiki-skills status\`.\n`;
+}
+
+export function renderStatusReport(report: StatusReport): string {
+  return [
+    `Status: ${report.status.toUpperCase()}`,
+    `Root: ${report.root}`,
+    `Manifest: ${report.manifestPath}`,
+    `Hosts: ${report.hosts.join(", ")}`,
+    `Checked files: ${report.checkedFiles.length}`,
+    ""
+  ].join("\n");
 }
 
 export function buildHealthReport(root: string, pages: WikiPage[], issues: ValidationIssue[]): HealthReport {

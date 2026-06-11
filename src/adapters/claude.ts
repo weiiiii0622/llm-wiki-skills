@@ -1,45 +1,79 @@
-export function claudeSkillContent(): string {
-  return `# LLM Wiki Maintainer
+import type { HostAdapter } from "../core/types.js";
 
-Maintain this vault as a persistent, source-grounded markdown knowledge graph.
+export function claudeCodeAdapter(): HostAdapter {
+  return {
+    id: "claude-code",
+    label: "Claude Code",
+    skillRoot: ".claude/skills",
+    skills: [
+      {
+        name: "llm-wiki-ingest",
+        content: `# LLM Wiki Ingest
 
-Default workflow:
-1. Read \`wiki/index.md\` first.
-2. Search the vault before creating new pages.
-3. Preserve \`raw/\` unless the user explicitly asks for raw source migration.
-4. Prefer updating existing topic pages over creating duplicate pages.
-5. Regenerate graph sidecars with \`llm-wiki-skills graph\`.
+Use this skill when adding source material to a local LLM wiki vault.
 
-## wiki-ingest
+## Contract
 
-Use when adding source material to the vault.
+- Treat \`raw/\` as preserved evidence unless the user explicitly asks for cleanup.
+- Keep durable synthesis in \`wiki/\` with YAML frontmatter and Obsidian wikilinks.
+- Search before creating new pages.
+- Update overlapping pages before adding duplicates.
+- Link claims back to source pages.
 
-1. Preserve original source files under \`raw/sources/\` or \`raw/notes/\` when requested.
-2. Create source summary pages under \`wiki/sources/\`.
-3. Extract durable topics, entities, concepts, claims, examples, and open questions.
-4. Update overlapping existing pages before creating new ones.
-5. Link pages with Obsidian wikilinks and source frontmatter.
-6. Update indexes and logs, then run \`llm-wiki-skills graph\` and \`llm-wiki-skills lint\`.
+## Workflow
 
-## wiki-query
+1. Read \`docs/llm-wiki-contract.md\` and \`docs/llm-wiki-workflows.md\`.
+2. Place original files or notes under \`raw/sources/\` or \`raw/notes/\` when they should be retained.
+3. Create source summaries under \`wiki/sources/\`.
+4. Extract reusable topics, entities, concepts, claims, examples, and questions.
+5. Update \`wiki/index.md\` and \`wiki/log.md\`.
+6. Use the \`llm-wiki-lint\` skill to check the vault.
+`
+      },
+      {
+        name: "llm-wiki-query",
+        content: `# LLM Wiki Query
 
-Use when answering questions against the vault.
+Use this skill when answering questions against a local LLM wiki vault.
+
+## Contract
+
+- Start from the vault index.
+- Read relevant source pages before relying on synthesis.
+- Distinguish sourced facts from inference.
+- Note uncertainty and source gaps.
+
+## Workflow
 
 1. Read \`wiki/index.md\`.
 2. Search \`wiki/\` with \`rg\`.
-3. Read the relevant source and synthesis pages.
-4. Answer with page citations and separate sourced facts from inference.
-5. If the answer should become durable, save it under \`wiki/questions/\`, update indexes/logs, then run graph and lint.
-`;
-}
+3. Read matching source, topic, entity, concept, and question pages.
+4. Answer with citations to wiki page paths.
+5. If the user wants the answer preserved, save it under \`wiki/questions/\`, update index/log files, and use the \`llm-wiki-lint\` skill.
+`
+      },
+      {
+        name: "llm-wiki-lint",
+        content: `# LLM Wiki Lint
 
-export function claudeProjectInstructions(): string {
-  return `# Claude Code Instructions
+Use this skill before finalizing durable local LLM wiki edits.
 
-Use the local LLM wiki contract:
-- pages live in \`wiki/\`;
-- immutable evidence lives in \`raw/\`;
-- generated graph sidecars are \`wiki/graph.json\` and \`wiki/graph.md\`;
-- run \`llm-wiki-skills lint\` before finalizing durable wiki edits.
-`;
+## Checks
+
+- Wiki pages include parseable YAML frontmatter.
+- Required metadata is present and consistent with the page type.
+- Wikilinks resolve or are clearly intentional placeholders.
+- Raw evidence was not edited without explicit user direction.
+- New pages do not duplicate existing durable synthesis.
+
+## Workflow
+
+1. Review changed files under \`wiki/\`, \`docs/\`, and \`raw/\`.
+2. Confirm factual claims are backed by source pages.
+3. Search for near-duplicate topic names.
+4. Return file-specific issues and suggested fixes.
+`
+      }
+    ]
+  };
 }

@@ -7,7 +7,12 @@ export class LlmWikiError extends Error {
       | "GraphDriftError"
       | "ImmutableRawViolationError"
       | "WriteConflictError"
-      | "PackageAssetMissingError",
+      | "PackageAssetMissingError"
+      | "InvalidHostError"
+      | "HostRequiredError"
+      | "HostSelectionCanceledError"
+      | "RequiredFileMissingError"
+      | "ManifestMismatchError",
     message: string,
     public readonly exitCode: number
   ) {
@@ -55,5 +60,35 @@ export class WriteConflictError extends LlmWikiError {
 export class PackageAssetMissingError extends LlmWikiError {
   constructor(message: string) {
     super("PackageAssetMissingError", message, 8);
+  }
+}
+
+export class InvalidHostError extends LlmWikiError {
+  constructor(message: string) {
+    super("InvalidHostError", message, 9);
+  }
+}
+
+export class HostRequiredError extends LlmWikiError {
+  constructor(message = "Select at least one host with --host when running outside a TTY.") {
+    super("HostRequiredError", message, 10);
+  }
+}
+
+export class HostSelectionCanceledError extends LlmWikiError {
+  constructor(message = "Host selection canceled.") {
+    super("HostSelectionCanceledError", message, 11);
+  }
+}
+
+export class RequiredFileMissingError extends LlmWikiError {
+  constructor(message: string) {
+    super("RequiredFileMissingError", message, 12);
+  }
+}
+
+export class ManifestMismatchError extends LlmWikiError {
+  constructor(message: string) {
+    super("ManifestMismatchError", message, 13);
   }
 }
