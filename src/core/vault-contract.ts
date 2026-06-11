@@ -100,7 +100,7 @@ tags:
 ---
 # Overview
 
-This vault stores durable, source-grounded knowledge as clean markdown pages and a generated graph sidecar.
+This vault stores durable, source-grounded knowledge as clean markdown pages that compound over time.
 
 ## Starting Points
 
@@ -134,6 +134,7 @@ This repository is a local-first LLM wiki vault.
 - Pages stay source-grounded and link back to source pages.
 - Obsidian wikilinks are allowed for relationships between wiki pages.
 - Existing synthesis should be updated before creating duplicate pages.
+- Contradictions and stale claims should be called out instead of hidden.
 `,
     "docs/llm-wiki-workflows.md": `# LLM Wiki Workflows
 
@@ -143,7 +144,8 @@ This repository is a local-first LLM wiki vault.
 2. Create source summaries under \`wiki/sources/\`.
 3. Search existing synthesis before adding new pages.
 4. Update overlapping topic, entity, concept, or question pages.
-5. Update \`wiki/index.md\` and \`wiki/log.md\`.
+5. Flag contradictions when new sources challenge older claims.
+6. Update \`wiki/index.md\` and \`wiki/log.md\`.
 
 ## Query
 
@@ -151,14 +153,15 @@ This repository is a local-first LLM wiki vault.
 2. Search \`wiki/\` for relevant source and synthesis pages.
 3. Read source pages before relying on claims.
 4. Answer with citations to wiki page paths.
-5. Save answers under \`wiki/questions/\` only when durable storage is requested.
+5. Save useful answers under \`wiki/questions/\` or another appropriate wiki section when they should compound into future work.
 
 ## Lint
 
-1. Check frontmatter and required metadata.
-2. Confirm wikilinks point to intended pages.
-3. Confirm new claims cite source pages.
-4. Confirm raw evidence was not changed without explicit user direction.
+1. Look for contradictions and stale claims superseded by newer sources.
+2. Find orphan pages, missing cross-references, and duplicated topics.
+3. Identify important mentioned concepts, entities, or questions that need pages.
+4. List data gaps that need follow-up questions, new sources, or web research.
+5. Check basic structure issues such as missing frontmatter, broken wikilinks, or uncited claims.
 `
   };
 }

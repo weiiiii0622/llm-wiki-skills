@@ -16,8 +16,10 @@ Use this skill when adding source material to a local LLM wiki vault.
 
 - Preserve raw evidence under \`raw/\` unless the user explicitly requests cleanup.
 - Keep durable synthesis in \`wiki/\` as Obsidian-compatible markdown.
+- Treat the wiki as a persistent, compounding artifact, not a one-off summary.
 - Search existing pages before creating new topics, entities, concepts, or questions.
 - Prefer updating overlapping pages over creating duplicates.
+- Flag contradictions when new sources challenge older claims.
 - Cite source pages from frontmatter and body wikilinks.
 
 ## Workflow
@@ -25,9 +27,10 @@ Use this skill when adding source material to a local LLM wiki vault.
 1. Read \`docs/llm-wiki-contract.md\` and \`docs/llm-wiki-workflows.md\`.
 2. Store original source files or notes under \`raw/sources/\` or \`raw/notes/\` when preservation is needed.
 3. Create one source summary under \`wiki/sources/\` for each source unit.
-4. Extract durable topics, entities, concepts, claims, examples, and open questions.
-5. Update \`wiki/index.md\` and append \`wiki/log.md\` with the change.
-6. Use the \`llm-wiki-lint\` skill to check the vault before handoff.
+4. Extract durable topics, entities, concepts, claims, examples, contradictions, and open questions.
+5. Update related pages across \`wiki/topics/\`, \`wiki/entities/\`, \`wiki/concepts/\`, and \`wiki/questions/\`.
+6. Update \`wiki/index.md\` and append \`wiki/log.md\` with the change.
+7. Use the \`llm-wiki-lint\` skill to health-check the wiki before handoff.
 `
       },
       {
@@ -41,7 +44,7 @@ Use this skill when answering questions against a local LLM wiki vault.
 - Read source-grounded pages before making factual claims.
 - Separate sourced facts from inference.
 - Call out missing or conflicting evidence.
-- Preserve answers only when the user asks for durable storage.
+- Preserve useful answers as wiki pages when they should compound into future work.
 
 ## Workflow
 
@@ -49,29 +52,33 @@ Use this skill when answering questions against a local LLM wiki vault.
 2. Search \`wiki/\` with \`rg\` for relevant source and synthesis pages.
 3. Read the source pages behind any claim you plan to use.
 4. Answer with citations to wiki page paths.
-5. If the answer should become durable, save it under \`wiki/questions/\`, update index/log files, and use the \`llm-wiki-lint\` skill.
+5. If the answer should become durable, save it under \`wiki/questions/\` or another appropriate wiki section.
+6. Update \`wiki/index.md\`, append \`wiki/log.md\`, and use the \`llm-wiki-lint\` skill when new pages or claims are added.
 `
       },
       {
         name: "llm-wiki-lint",
         content: `# LLM Wiki Lint
 
-Use this skill before handing off durable edits to a local LLM wiki vault.
+Use this skill to health-check a local LLM wiki as it grows.
 
 ## Checks
 
-- Every wiki page has YAML frontmatter.
-- Frontmatter includes \`type\`, \`status\`, \`sources\`, and \`tags\` where relevant.
-- Wikilinks point to existing pages or intentionally unresolved future pages.
-- Raw evidence under \`raw/\` was not changed without explicit user direction.
-- New synthesis is source-grounded and avoids duplicate topic pages.
+- Contradictions between pages or claims that newer sources have superseded.
+- Stale summaries that no longer reflect the current source set.
+- Orphan pages with no useful inbound or outbound links.
+- Important concepts, entities, or questions mentioned without their own page.
+- Missing cross-references between related source and synthesis pages.
+- Data gaps that need more sources, follow-up questions, or web research.
+- Basic structure issues such as missing frontmatter, broken wikilinks, or uncited claims.
 
 ## Workflow
 
-1. Inspect changed files under \`wiki/\`, \`docs/\`, and \`raw/\`.
-2. Verify linked source pages exist for new factual claims.
-3. Search for duplicate or overlapping page titles.
-4. Report concrete issues with file paths and fixes.
+1. Read \`wiki/index.md\` to understand the current map.
+2. Review recent entries in \`wiki/log.md\` to see what changed lately.
+3. Sample connected source, topic, entity, concept, and question pages.
+4. Search for duplicated topics, unresolved mentions, stale claims, and contradictions.
+5. Report concrete fixes with file paths, plus new questions or sources worth investigating.
 `
       }
     ]

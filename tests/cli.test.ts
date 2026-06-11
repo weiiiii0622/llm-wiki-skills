@@ -78,8 +78,14 @@ describe("cli", () => {
     const combined = (await Promise.all(files.map((file) => readFile(path.join(root, file), "utf8")))).join("\n");
     expect(combined).toContain("## Workflow");
     expect(combined).toContain("## Contract");
+    expect(combined).toContain("persistent, compounding artifact");
+    expect(combined).toContain("Contradictions");
+    expect(combined).toContain("Orphan pages");
+    expect(combined).toContain("Data gaps");
+    expect(combined).toContain("new questions or sources worth investigating");
     expect(combined).not.toContain("llm-wiki-skills graph");
     expect(combined).not.toContain("llm-wiki-skills lint");
+    expect(combined).not.toContain("Review changed files");
   });
 
   it("status --json passes after init", async () => {
