@@ -9,9 +9,9 @@ describe("cli", () => {
     const root = await tempRoot("llm-wiki-codex-");
     await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--quiet"], fixedEnv());
 
-    await expect(readFile(path.join(root, ".codex/skills/llm-wiki-ingest/SKILL.md"), "utf8")).resolves.toContain("# LLM Wiki Ingest");
-    await expect(readFile(path.join(root, ".codex/skills/llm-wiki-query/SKILL.md"), "utf8")).resolves.toContain("# LLM Wiki Query");
-    await expect(readFile(path.join(root, ".codex/skills/llm-wiki-lint/SKILL.md"), "utf8")).resolves.toContain("# LLM Wiki Lint");
+    await expect(readFile(path.join(root, ".agents/skills/llm-wiki-ingest/SKILL.md"), "utf8")).resolves.toContain("# LLM Wiki Ingest");
+    await expect(readFile(path.join(root, ".agents/skills/llm-wiki-query/SKILL.md"), "utf8")).resolves.toContain("# LLM Wiki Query");
+    await expect(readFile(path.join(root, ".agents/skills/llm-wiki-lint/SKILL.md"), "utf8")).resolves.toContain("# LLM Wiki Lint");
     await expect(readFile(path.join(root, ".claude/skills/llm-wiki-ingest/SKILL.md"), "utf8")).rejects.toThrow();
 
     const manifest = JSON.parse(await readFile(path.join(root, ".llm-wiki-skills.json"), "utf8"));
@@ -23,7 +23,7 @@ describe("cli", () => {
     await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "claude-code", "--quiet"], fixedEnv());
 
     await expect(readFile(path.join(root, ".claude/skills/llm-wiki-ingest/SKILL.md"), "utf8")).resolves.toContain("# LLM Wiki Ingest");
-    await expect(readFile(path.join(root, ".codex/skills/llm-wiki-ingest/SKILL.md"), "utf8")).rejects.toThrow();
+    await expect(readFile(path.join(root, ".agents/skills/llm-wiki-ingest/SKILL.md"), "utf8")).rejects.toThrow();
 
     const manifest = JSON.parse(await readFile(path.join(root, ".llm-wiki-skills.json"), "utf8"));
     expect(manifest.hosts).toEqual(["claude-code"]);
@@ -33,7 +33,7 @@ describe("cli", () => {
     const root = await tempRoot("llm-wiki-both-");
     await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex,claude-code", "--host", "codex", "--quiet"], fixedEnv());
 
-    await expect(readFile(path.join(root, ".codex/skills/llm-wiki-query/SKILL.md"), "utf8")).resolves.toContain("# LLM Wiki Query");
+    await expect(readFile(path.join(root, ".agents/skills/llm-wiki-query/SKILL.md"), "utf8")).resolves.toContain("# LLM Wiki Query");
     await expect(readFile(path.join(root, ".claude/skills/llm-wiki-query/SKILL.md"), "utf8")).resolves.toContain("# LLM Wiki Query");
 
     const manifest = JSON.parse(await readFile(path.join(root, ".llm-wiki-skills.json"), "utf8"));
@@ -68,9 +68,9 @@ describe("cli", () => {
     const files = [
       "docs/llm-wiki-contract.md",
       "docs/llm-wiki-workflows.md",
-      ".codex/skills/llm-wiki-ingest/SKILL.md",
-      ".codex/skills/llm-wiki-query/SKILL.md",
-      ".codex/skills/llm-wiki-lint/SKILL.md",
+      ".agents/skills/llm-wiki-ingest/SKILL.md",
+      ".agents/skills/llm-wiki-query/SKILL.md",
+      ".agents/skills/llm-wiki-lint/SKILL.md",
       ".claude/skills/llm-wiki-ingest/SKILL.md",
       ".claude/skills/llm-wiki-query/SKILL.md",
       ".claude/skills/llm-wiki-lint/SKILL.md"
@@ -86,6 +86,10 @@ describe("cli", () => {
     expect(combined).not.toContain("llm-wiki-skills graph");
     expect(combined).not.toContain("llm-wiki-skills lint");
     expect(combined).not.toContain("Review changed files");
+    for (const file of files.filter((candidate) => candidate.endsWith("/SKILL.md"))) {
+      const content = await readFile(path.join(root, file), "utf8");
+      expect(content).toMatch(/^---\nname: llm-wiki-(ingest|query|lint)\ndescription: .+\n---\n\n# LLM Wiki (Ingest|Query|Lint)/);
+    }
   });
 
   it("status --json passes after init", async () => {
@@ -133,7 +137,7 @@ describe("cli", () => {
     await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--quiet"], fixedEnv());
     const manifestPath = path.join(root, ".llm-wiki-skills.json");
     const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-    manifest.files = manifest.files.filter((file: string) => file !== ".codex/skills/llm-wiki-lint/SKILL.md");
+    manifest.files = manifest.files.filter((file: string) => file !== ".agents/skills/llm-wiki-lint/SKILL.md");
     await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 
     const result = await execaNode(["dist/cli/index.js", "status", "--root", root], fixedEnv(), false);

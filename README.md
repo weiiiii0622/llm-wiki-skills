@@ -78,7 +78,7 @@ docs/llm-wiki-workflows.md   ingest/query/lint workflow reference
 .llm-wiki-skills.json        install manifest for status checks
 ```
 
-For Codex, it writes skills under `.codex/skills/`. For Claude Code, it writes skills under `.claude/skills/`. Existing files are skipped on rerun so local edits are not overwritten.
+For Codex, it writes repo-scoped skills under `.agents/skills/`. For Claude Code, it writes project skills under `.claude/skills/`. Existing files are skipped on rerun so local edits are not overwritten.
 
 ## Commands
 

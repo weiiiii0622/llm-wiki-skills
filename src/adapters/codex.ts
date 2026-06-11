@@ -4,11 +4,16 @@ export function codexAdapter(): HostAdapter {
   return {
     id: "codex",
     label: "Codex",
-    skillRoot: ".codex/skills",
+    skillRoot: ".agents/skills",
     skills: [
       {
         name: "llm-wiki-ingest",
-        content: `# LLM Wiki Ingest
+        content: `---
+name: llm-wiki-ingest
+description: Use when adding source material to a local LLM wiki vault and integrating it into durable wiki pages.
+---
+
+# LLM Wiki Ingest
 
 Use this skill when adding source material to a local LLM wiki vault.
 
@@ -35,7 +40,12 @@ Use this skill when adding source material to a local LLM wiki vault.
       },
       {
         name: "llm-wiki-query",
-        content: `# LLM Wiki Query
+        content: `---
+name: llm-wiki-query
+description: Use when answering questions from a local LLM wiki with source-grounded citations.
+---
+
+# LLM Wiki Query
 
 Use this skill when answering questions against a local LLM wiki vault.
 
@@ -58,7 +68,12 @@ Use this skill when answering questions against a local LLM wiki vault.
       },
       {
         name: "llm-wiki-lint",
-        content: `# LLM Wiki Lint
+        content: `---
+name: llm-wiki-lint
+description: Use when health-checking a local LLM wiki for stale claims, contradictions, orphan pages, and missing links.
+---
+
+# LLM Wiki Lint
 
 Use this skill to health-check a local LLM wiki as it grows.
 
