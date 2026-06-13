@@ -151,6 +151,7 @@ This repository is a local-first LLM wiki vault.
 - \`wiki/\` stores durable synthesis as markdown pages.
 - \`wiki/sources/\` summarizes individual source units.
 - \`wiki/topics/\`, \`wiki/entities/\`, \`wiki/concepts/\`, and \`wiki/questions/\` store reusable knowledge pages.
+- Topic scaffolds may add additional \`wiki/\` category directories and \`docs/llm-wiki-routing.md\`.
 - \`docs/\` stores vault operating references.
 
 ## Page Rules
@@ -167,18 +168,20 @@ This repository is a local-first LLM wiki vault.
 
 1. Preserve source material under \`raw/sources/\` or \`raw/notes/\` when needed.
 2. Create source summaries under \`wiki/sources/\`.
-3. Search existing synthesis before adding new pages.
-4. Update overlapping topic, entity, concept, or question pages.
-5. Flag contradictions when new sources challenge older claims.
-6. Update \`wiki/index.md\` and \`wiki/log.md\`.
+3. Read \`docs/llm-wiki-routing.md\` when present to choose the right \`wiki/\` category.
+4. Search existing synthesis before adding new pages.
+5. Update overlapping topic, entity, concept, question, or topic-specific category pages.
+6. Flag contradictions when new sources challenge older claims.
+7. Update \`wiki/index.md\` and \`wiki/log.md\`.
 
 ## Query
 
 1. Read \`wiki/index.md\`.
-2. Search \`wiki/\` for relevant source and synthesis pages.
-3. Read source pages before relying on claims.
-4. Answer with citations to wiki page paths.
-5. Save useful answers under \`wiki/questions/\` or another appropriate wiki section when they should compound into future work.
+2. Read \`docs/llm-wiki-routing.md\` when present.
+3. Search \`wiki/\` for relevant source and synthesis pages.
+4. Read source pages before relying on claims.
+5. Answer with citations to wiki page paths.
+6. Save useful answers under \`wiki/questions/\` or another appropriate wiki section when they should compound into future work.
 
 ## Lint
 

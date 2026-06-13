@@ -9,6 +9,8 @@ export class LlmWikiError extends Error {
       | "WriteConflictError"
       | "PackageAssetMissingError"
       | "InvalidHostError"
+      | "InvalidTopicError"
+      | "ConflictingTopicOptionError"
       | "HostRequiredError"
       | "HostSelectionCanceledError"
       | "RequiredFileMissingError"
@@ -69,14 +71,28 @@ export class InvalidHostError extends LlmWikiError {
   }
 }
 
+export class InvalidTopicError extends LlmWikiError {
+  constructor(message: string) {
+    super("InvalidTopicError", message, 14);
+  }
+}
+
+export class ConflictingTopicOptionError extends LlmWikiError {
+  constructor(message: string) {
+    super("ConflictingTopicOptionError", message, 15);
+  }
+}
+
 export class HostRequiredError extends LlmWikiError {
   constructor(message = "Select at least one host with --host when running outside a TTY.") {
     super("HostRequiredError", message, 10);
   }
 }
 
+export const INIT_CANCELED_MESSAGE = "llm-wiki-skills initialization canceled.";
+
 export class HostSelectionCanceledError extends LlmWikiError {
-  constructor(message = "Host selection canceled.") {
+  constructor(message = INIT_CANCELED_MESSAGE) {
     super("HostSelectionCanceledError", message, 11);
   }
 }

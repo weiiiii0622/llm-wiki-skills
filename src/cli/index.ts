@@ -44,6 +44,18 @@ export function parseCommand(argv: string[]): { command: string; options: Comman
       const value = args.shift();
       if (!value) throw new Error("--host requires a value");
       hostValues.push(value);
+    } else if (arg === "--topic") {
+      const value = args.shift();
+      if (!value) throw new Error("--topic requires a value");
+      options.topicValues.push(value);
+    } else if (arg === "--template") {
+      const value = args.shift();
+      if (!value) throw new Error("--template requires a value");
+      options.templateValues.push(value);
+    } else if (arg === "--custom-topic") {
+      const value = args.shift();
+      if (!value) throw new Error("--custom-topic requires a value");
+      options.customTopic = value;
     } else if (arg === "--json") {
       options.json = true;
     } else if (arg === "--debug") {
@@ -64,7 +76,9 @@ function defaults(): CommandOptions {
     json: false,
     debug: false,
     quiet: false,
-    hosts: []
+    hosts: [],
+    topicValues: [],
+    templateValues: []
   };
 }
 
@@ -76,12 +90,16 @@ Codex or Claude Code to ingest sources, answer from the wiki, and
 health-check the wiki over time.
 
 Usage:
-  llm-wiki-skills init [--root DIR] [--host codex|claude-code] [--json] [--quiet]
+  llm-wiki-skills init [--root DIR] [--host codex|claude-code] [--topic ID] [--json] [--quiet]
   llm-wiki-skills status [--root DIR] [--json] [--quiet]
 
 Hosts:
   codex        writes repo skills to .agents/skills
   claude-code  writes project skills to .claude/skills
+
+Topics:
+  general, study-research, work-project, product-builder, writing-content,
+  trip-plan, finance, home-life, medical, legal-admin, custom
 
 First run:
   npx llm-wiki-skills init

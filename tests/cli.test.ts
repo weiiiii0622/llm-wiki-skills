@@ -1,6 +1,7 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { INIT_CANCELED_MESSAGE } from "../src/core/errors.js";
 import { execaNode } from "./helpers/process.js";
 import { describe, expect, it } from "vitest";
 
@@ -40,6 +41,104 @@ describe("cli", () => {
     expect(manifest.hosts).toEqual(["claude-code", "codex"]);
   });
 
+  it("init --topic writes topic metadata, directories, and routing guide", async () => {
+    const root = await tempRoot("llm-wiki-topic-");
+    const result = await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--topic", "finance", "--json"], fixedEnv());
+
+    const output = JSON.parse(result.stdout);
+    expect(output.topic).toMatchObject({ id: "finance", scaffoldId: "finance", label: "Finance" });
+    expect(output.files["wiki/accounts/"]).toBe("created");
+    expect(output.files["docs/llm-wiki-routing.md"]).toBe("created");
+    expect((await stat(path.join(root, "wiki/accounts"))).isDirectory()).toBe(true);
+    await expect(readFile(path.join(root, "docs/llm-wiki-routing.md"), "utf8")).resolves.toContain("`wiki/accounts/`: Bank");
+
+    const manifest = JSON.parse(await readFile(path.join(root, ".llm-wiki-skills.json"), "utf8"));
+    expect(manifest.topic).toMatchObject({ id: "finance", scaffoldId: "finance" });
+    expect(manifest.files).not.toContain("docs/llm-wiki-routing.md");
+    expect(manifest.directories).not.toContain("wiki/accounts");
+  });
+
+  it("--template is an alias for --topic and matching duplicate values are allowed", async () => {
+    const root = await tempRoot("llm-wiki-template-alias-");
+    const result = await execaNode(
+      ["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--topic", "trip-plan", "--template", "trip-plan", "--json"],
+      fixedEnv()
+    );
+
+    const output = JSON.parse(result.stdout);
+    expect(output.topic).toMatchObject({ id: "trip-plan", scaffoldId: "trip-plan" });
+    expect(output.files["wiki/itinerary/"]).toBe("created");
+  });
+
+  it("medical replaces the old health-fitness topic", async () => {
+    const root = await tempRoot("llm-wiki-medical-topic-");
+    const result = await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--topic", "medical", "--json"], fixedEnv());
+
+    const output = JSON.parse(result.stdout);
+    expect(output.topic).toMatchObject({ id: "medical", scaffoldId: "medical", label: "Medical" });
+    expect(output.files["wiki/anatomy/"]).toBe("created");
+    await expect(readFile(path.join(root, "docs/llm-wiki-routing.md"), "utf8")).resolves.toContain("`wiki/drugs/`: Medications");
+
+    const invalid = await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--topic", "health-fitness"], fixedEnv(), false);
+    expect(invalid.exitCode).toBe(14);
+    expect(invalid.stderr).toContain("Unknown topic: health-fitness.");
+    expect(invalid.stderr).toContain("medical");
+  });
+
+  it("conflicting --topic and --template values fail", async () => {
+    const root = await tempRoot("llm-wiki-topic-conflict-");
+    const result = await execaNode(
+      ["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--topic", "finance", "--template", "trip-plan"],
+      fixedEnv(),
+      false
+    );
+
+    expect(result.exitCode).toBe(15);
+    expect(result.stderr).toContain("Conflicting topic values: finance, trip-plan");
+    expectProjectErrorCodeHidden(result.stderr);
+  });
+
+  it("invalid topic values fail", async () => {
+    const root = await tempRoot("llm-wiki-invalid-topic-");
+    const result = await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--topic", "unknown"], fixedEnv(), false);
+
+    expect(result.exitCode).toBe(14);
+    expect(result.stderr).toContain("Unknown topic: unknown.");
+    expectProjectErrorCodeHidden(result.stderr);
+  });
+
+  it("custom topic validates handoff text and stays machine-friendly for json and quiet", async () => {
+    const jsonRoot = await tempRoot("llm-wiki-custom-json-");
+    const quietRoot = await tempRoot("llm-wiki-custom-quiet-");
+    const invalidRoot = await tempRoot("llm-wiki-custom-invalid-");
+
+    const json = await execaNode(
+      ["dist/cli/index.js", "init", "--root", jsonRoot, "--host", "codex", "--topic", "custom", "--custom-topic", "AI operations notes", "--json"],
+      fixedEnv()
+    );
+    const parsed = JSON.parse(json.stdout);
+    expect(parsed.topic).toMatchObject({ id: "custom", scaffoldId: "general", customTopic: "AI operations notes" });
+    expect(parsed.customHandoffPrompt).toContain("AI operations notes");
+    expect(json.stdout).not.toMatch(/\x1b\[/);
+    await expect(readFile(path.join(jsonRoot, "docs/llm-wiki-routing.md"), "utf8")).resolves.toContain("Topic: Custom topic (custom)");
+
+    const quiet = await execaNode(
+      ["dist/cli/index.js", "init", "--root", quietRoot, "--host", "codex", "--topic", "custom", "--custom-topic", "AI operations notes", "--quiet"],
+      fixedEnv()
+    );
+    expect(quiet.stdout).toBe("");
+    expect(quiet.stderr).toBe("");
+
+    const invalid = await execaNode(
+      ["dist/cli/index.js", "init", "--root", invalidRoot, "--host", "codex", "--topic", "custom", "--custom-topic", "line\nbreak"],
+      fixedEnv(),
+      false
+    );
+    expect(invalid.exitCode).toBe(14);
+    expect(invalid.stderr).toContain("--custom-topic must be 1-120 printable single-line characters.");
+    expectProjectErrorCodeHidden(invalid.stderr);
+  });
+
   it("non-TTY init without host returns HostRequiredError", async () => {
     const root = await tempRoot("llm-wiki-host-required-");
     const result = await execaNode(["dist/cli/index.js", "init", "--root", root], fixedEnv(), false);
@@ -71,7 +170,17 @@ describe("cli", () => {
     const result = await execaNode(["dist/cli/index.js", "init", "--root", root], fixedEnv({ cancel: "hosts" }), false);
 
     expect(result.exitCode).toBe(11);
-    expect(result.stderr).toBe("Host selection canceled.\n");
+    expect(result.stderr).toBe(`${INIT_CANCELED_MESSAGE}\n`);
+    expectProjectErrorCodeHidden(result.stderr);
+    await expect(readFile(path.join(root, ".llm-wiki-skills.json"), "utf8")).rejects.toThrow();
+  });
+
+  it("interactive init cancel during topic selection writes nothing", async () => {
+    const root = await tempRoot("llm-wiki-interactive-cancel-topic-");
+    const result = await execaNode(["dist/cli/index.js", "init", "--root", root], fixedEnv({ hosts: ["codex"], cancel: "topic" }), false);
+
+    expect(result.exitCode).toBe(11);
+    expect(result.stderr).toBe(`${INIT_CANCELED_MESSAGE}\n`);
     expectProjectErrorCodeHidden(result.stderr);
     await expect(readFile(path.join(root, ".llm-wiki-skills.json"), "utf8")).rejects.toThrow();
   });
@@ -81,7 +190,7 @@ describe("cli", () => {
     const result = await execaNode(["dist/cli/index.js", "init", "--root", root], fixedEnv({ hosts: ["codex"], confirm: false }), false);
 
     expect(result.exitCode).toBe(11);
-    expect(result.stderr).toBe("Init canceled before writing files.\n");
+    expect(result.stderr).toBe(`${INIT_CANCELED_MESSAGE}\n`);
     expectProjectErrorCodeHidden(result.stderr);
     await expect(readFile(path.join(root, ".agents/skills/llm-wiki-ingest/SKILL.md"), "utf8")).rejects.toThrow();
   });
@@ -106,7 +215,7 @@ describe("cli", () => {
     const json = await execaNode(["dist/cli/index.js", "init", "--root", jsonRoot, "--host", "codex", "--json"], fixedEnv());
     const quiet = await execaNode(["dist/cli/index.js", "init", "--root", quietRoot, "--host", "codex", "--quiet"], fixedEnv());
 
-    expect(JSON.parse(json.stdout)).toMatchObject({ root: jsonRoot, hosts: ["codex"] });
+    expect(JSON.parse(json.stdout)).toMatchObject({ root: jsonRoot, hosts: ["codex"], topic: { id: "general", scaffoldId: "general" } });
     expect(json.stdout).not.toMatch(/\x1b\[/);
     expect(quiet.stdout).toBe("");
     expect(quiet.stderr).toBe("");
@@ -169,7 +278,17 @@ describe("cli", () => {
     const root = await tempRoot("llm-wiki-status-");
     await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--quiet"], fixedEnv());
     const status = await execaNode(["dist/cli/index.js", "status", "--root", root, "--json"], fixedEnv());
-    expect(JSON.parse(status.stdout)).toMatchObject({ status: "pass", hosts: ["codex"] });
+    expect(JSON.parse(status.stdout)).toMatchObject({ status: "pass", hosts: ["codex"], topic: { id: "general", scaffoldId: "general" } });
+  });
+
+  it("status passes after deleting optional topic scaffold pages", async () => {
+    const root = await tempRoot("llm-wiki-status-optional-topic-");
+    await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--topic", "finance", "--quiet"], fixedEnv());
+    await rm(path.join(root, "wiki/accounts"), { recursive: true });
+    await rm(path.join(root, "docs/llm-wiki-routing.md"));
+
+    const status = await execaNode(["dist/cli/index.js", "status", "--root", root, "--json"], fixedEnv());
+    expect(JSON.parse(status.stdout)).toMatchObject({ status: "pass", topic: { id: "finance", scaffoldId: "finance" } });
   });
 
   it("status fails for missing manifest", async () => {
@@ -230,6 +349,24 @@ describe("cli", () => {
     await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--quiet"], fixedEnv());
     await expect(readFile(path.join(root, "wiki/overview.md"), "utf8")).resolves.toBe("custom overview\n");
   });
+
+  it("rerun init skips edited topic scaffold files and adds missing optional scaffold pages", async () => {
+    const root = await tempRoot("llm-wiki-topic-rerun-");
+    await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--topic", "finance", "--quiet"], fixedEnv());
+    await writeFile(path.join(root, "docs/llm-wiki-routing.md"), "custom finance\n", "utf8");
+
+    const firstRerun = await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--topic", "finance", "--json"], fixedEnv());
+    expect(JSON.parse(firstRerun.stdout).files["docs/llm-wiki-routing.md"]).toBe("skipped");
+    expect(JSON.parse(firstRerun.stdout).files["wiki/accounts/"]).toBe("skipped");
+    await expect(readFile(path.join(root, "docs/llm-wiki-routing.md"), "utf8")).resolves.toBe("custom finance\n");
+
+    await rm(path.join(root, "docs/llm-wiki-routing.md"));
+    await rm(path.join(root, "wiki/accounts"), { recursive: true });
+    const secondRerun = await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--topic", "finance", "--json"], fixedEnv());
+    expect(JSON.parse(secondRerun.stdout).files["docs/llm-wiki-routing.md"]).toBe("created");
+    expect(JSON.parse(secondRerun.stdout).files["wiki/accounts/"]).toBe("created");
+    await expect(readFile(path.join(root, "docs/llm-wiki-routing.md"), "utf8")).resolves.toContain("# LLM Wiki Routing");
+  });
 });
 
 function fixedEnv(promptAnswers?: Record<string, unknown>): Record<string, string> {
@@ -245,6 +382,6 @@ async function tempRoot(prefix: string): Promise<string> {
 
 function expectProjectErrorCodeHidden(stderr: string): void {
   expect(stderr).not.toMatch(
-    /(VaultNotFoundError|InvalidFrontmatterError|BrokenLinkError|GraphDriftError|ImmutableRawViolationError|WriteConflictError|PackageAssetMissingError|InvalidHostError|HostRequiredError|HostSelectionCanceledError|RequiredFileMissingError|ManifestMismatchError):/
+    /(VaultNotFoundError|InvalidFrontmatterError|BrokenLinkError|GraphDriftError|ImmutableRawViolationError|WriteConflictError|PackageAssetMissingError|InvalidHostError|InvalidTopicError|ConflictingTopicOptionError|HostRequiredError|HostSelectionCanceledError|RequiredFileMissingError|ManifestMismatchError):/
   );
 }

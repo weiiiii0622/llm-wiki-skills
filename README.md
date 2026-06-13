@@ -38,6 +38,12 @@ Install both:
 npx llm-wiki-skills init --host codex,claude-code
 ```
 
+Start with a topic scaffold:
+
+```sh
+npx llm-wiki-skills init --host codex --topic product-builder
+```
+
 Check that the local install is complete:
 
 ```sh
@@ -80,18 +86,250 @@ docs/llm-wiki-workflows.md   ingest/query/lint workflow reference
 
 For Codex, it writes repo-scoped skills under `.agents/skills/`. For Claude Code, it writes project skills under `.claude/skills/`. Existing files are skipped on rerun so local edits are not overwritten.
 
+## Topic Directory Scaffolds
+
+`init` can add category directories for a specific kind of wiki. Use `--topic <id>` or the equivalent `--template <id>`. Topic directories and the routing guide are optional scaffolds: rerunning `init --topic <id>` recreates missing scaffold outputs, but `status` does not fail if you delete or replace them.
+
+Every built-in topic creates:
+
+- category directories under `wiki/`
+- `docs/llm-wiki-routing.md`, which tells generated agent skills how to route ingested notes
+
+Available topic options:
+
+### `general`
+
+Use this for mixed notes, broad research, and a neutral starting point.
+
+Creates these directories:
+
+```text
+wiki/
+|-- projects/
+|-- areas/
+|-- resources/
+|-- archives/
+|-- sources/
+|-- questions/
+`-- templates/
+```
+
+- examples: reading notes, personal research, small reusable answers
+
+### `study-research`
+
+Use this for papers, courses, research notes, claims, and unanswered questions.
+
+Creates these directories:
+
+```text
+wiki/
+|-- literature/
+|-- notes/
+|-- concepts/
+|-- methods/
+|-- datasets/
+|-- questions/
+|-- sources/
+`-- outputs/
+```
+
+- examples: paper reviews, course notes, research questions
+
+### `work-project`
+
+Use this for project context, decisions, stakeholders, risks, and delivery notes.
+
+Creates these directories:
+
+```text
+wiki/
+|-- projects/
+|-- decisions/
+|-- meetings/
+|-- stakeholders/
+|-- risks/
+|-- requirements/
+`-- sources/
+```
+
+- examples: decision logs, meeting notes, project references
+
+### `product-builder`
+
+Use this for customer evidence, product bets, market notes, and build decisions.
+
+Creates these directories:
+
+```text
+wiki/
+|-- users/
+|-- feedback/
+|-- problems/
+|-- solutions/
+|-- experiments/
+|-- competitors/
+|-- decisions/
+|-- metrics/
+`-- sources/
+```
+
+- examples: customer interviews, experiment notes, competitor research
+
+### `writing-content`
+
+Use this for source material, draft ideas, editorial notes, and reusable phrasing.
+
+Creates these directories:
+
+```text
+wiki/
+|-- ideas/
+|-- research/
+|-- claims/
+|-- outlines/
+|-- drafts/
+|-- revisions/
+|-- references/
+`-- published/
+```
+
+- examples: essay outlines, draft research, published pieces
+
+### `trip-plan`
+
+Use this for destination research, itineraries, bookings, travel constraints, and day plans.
+
+Creates these directories:
+
+```text
+wiki/
+|-- itinerary/
+|-- places/
+|-- transport/
+|-- lodging/
+|-- bookings/
+|-- budget/
+|-- packing/
+`-- sources/
+```
+
+- examples: itineraries, booking references, destination notes
+
+### `finance`
+
+Use this for budgets, tax references, investment research, assumptions, and review items. It keeps financial notes source-grounded and does not replace professional advice.
+
+Creates these directories:
+
+```text
+wiki/
+|-- accounts/
+|-- budget/
+|-- cashflow/
+|-- debts/
+|-- investments/
+|-- insurance/
+|-- taxes/
+|-- goals/
+|-- policies/
+|-- questions/
+`-- sources/
+```
+
+- examples: budget notes, tax references, investment research
+
+### `home-life`
+
+Use this for household systems, family operations, recurring routines, records, and home projects.
+
+Creates these directories:
+
+```text
+wiki/
+|-- household/
+|-- maintenance/
+|-- vendors/
+|-- inventory/
+|-- purchases/
+|-- warranties/
+|-- records/
+|-- routines/
+|-- emergency/
+`-- sources/
+```
+
+- examples: home projects, important records, recurring routines
+
+### `medical`
+
+Use this for anatomy, physiology, conditions, diagnostics, drugs, procedures, guidelines, cases, and questions for professional review.
+
+Creates these directories:
+
+```text
+wiki/
+|-- anatomy/
+|-- physiology/
+|-- conditions/
+|-- diagnostics/
+|-- drugs/
+|-- procedures/
+|-- guidelines/
+|-- cases/
+|-- questions/
+|-- sources/
+`-- templates/
+```
+
+- examples: clinical references, drug notes, diagnostic criteria
+
+### `legal-admin`
+
+Use this for administrative records, legal references, contracts, deadlines, and unresolved questions. It keeps legal notes organized and does not replace legal advice.
+
+Creates these directories:
+
+```text
+wiki/
+|-- matters/
+|-- documents/
+|-- contracts/
+|-- parties/
+|-- evidence/
+|-- deadlines/
+|-- correspondence/
+|-- filings/
+|-- questions/
+`-- sources/
+```
+
+- examples: contracts, evidence files, deadline checklists
+
+### `custom`
+
+Use this when none of the built-in topics match your vault.
+
+```sh
+npx llm-wiki-skills init --host codex --topic custom --custom-topic "board game design"
+```
+
+`custom` uses the `general` scaffold, creates `docs/llm-wiki-routing.md`, records custom topic metadata, and prints a handoff prompt you can give to your own LLM. The CLI does not call a hosted LLM or import generated structure files.
+
 ## Commands
 
 ```sh
-llm-wiki-skills init [--root DIR] [--host codex|claude-code] [--json] [--quiet]
+llm-wiki-skills init [--root DIR] [--host codex|claude-code] [--topic ID] [--json] [--quiet]
 llm-wiki-skills status [--root DIR] [--json] [--quiet]
 ```
 
-`init` installs the local wiki contract, starter pages, shared references, selected host skills, and a manifest.
+`init` installs the local wiki contract, starter pages, optional topic scaffold, shared references, selected host skills, and a manifest.
+
+`--template ID` is an alias for `--topic ID`. If both are provided, they must match.
 
 `status` verifies the manifest and required files still match the selected hosts.
 
-If `--host` is omitted in an interactive terminal, `init` opens a guided setup: choose host targets, review the files that will be created or refreshed, then confirm before anything is written. In scripts, CI, `--json`, or `--quiet` usage, pass `--host`.
+If `--host` is omitted in an interactive terminal, `init` opens a guided setup: choose host targets, choose a topic, review the files that will be created or refreshed, then confirm before anything is written. In scripts, CI, `--json`, or `--quiet` usage, pass `--host`.
 
 ## Requirements
 

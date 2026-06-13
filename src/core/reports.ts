@@ -3,7 +3,7 @@ import type { HealthReport, StatusReport, ValidationIssue, WikiGraph, WikiPage }
 export function renderInitReport(results: Record<string, "created" | "skipped">): string {
   const created = Object.entries(results).filter(([, status]) => status === "created").length;
   const skipped = Object.entries(results).filter(([, status]) => status === "skipped").length;
-  return `Initialized llm-wiki local skills.\nCreated: ${created}\nSkipped existing files: ${skipped}\nNext: run \`npx llm-wiki-skills status\`.\n`;
+  return `Initialized llm-wiki local skills.\nCreated: ${created}\nSkipped existing paths: ${skipped}\nNext: run \`npx llm-wiki-skills status\`.\n`;
 }
 
 export function renderStatusReport(report: StatusReport): string {
@@ -12,6 +12,7 @@ export function renderStatusReport(report: StatusReport): string {
     `Root: ${report.root}`,
     `Manifest: ${report.manifestPath}`,
     `Hosts: ${report.hosts.join(", ")}`,
+    `Topic: ${report.topic?.id ?? "unknown"}`,
     `Checked files: ${report.checkedFiles.length}`,
     ""
   ].join("\n");

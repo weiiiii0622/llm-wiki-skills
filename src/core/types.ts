@@ -1,3 +1,5 @@
+import type { TopicSelectionId, TopicTemplateId } from "./topic-templates.js";
+
 export type OutputMode = "human" | "json";
 
 export interface CommandOptions {
@@ -6,6 +8,9 @@ export interface CommandOptions {
   debug: boolean;
   quiet: boolean;
   hosts: HostId[];
+  topicValues: string[];
+  templateValues: string[];
+  customTopic?: string;
 }
 
 export type HostId = "codex" | "claude-code";
@@ -28,6 +33,13 @@ export interface Manifest {
   hosts: HostId[];
   directories: string[];
   files: string[];
+  topic?: ManifestTopicMetadata;
+}
+
+export interface ManifestTopicMetadata {
+  id: TopicSelectionId;
+  scaffoldId: TopicTemplateId;
+  customTopic?: string;
 }
 
 export interface WikiPage {
@@ -100,6 +112,7 @@ export interface StatusReport {
   root: string;
   manifestPath: string;
   hosts: HostId[];
+  topic?: ManifestTopicMetadata;
   checkedFiles: string[];
   missingFiles: string[];
   extraManifestFiles: string[];

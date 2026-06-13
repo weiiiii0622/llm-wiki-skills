@@ -29,11 +29,11 @@ Use this skill when adding source material to a local LLM wiki vault.
 
 ## Workflow
 
-1. Read \`docs/llm-wiki-contract.md\` and \`docs/llm-wiki-workflows.md\`.
+1. Read \`docs/llm-wiki-contract.md\`, \`docs/llm-wiki-workflows.md\`, and \`docs/llm-wiki-routing.md\` when present.
 2. Place original files or notes under \`raw/sources/\` or \`raw/notes/\` when they should be retained.
 3. Create source summaries under \`wiki/sources/\`.
 4. Extract reusable topics, entities, concepts, claims, examples, contradictions, and questions.
-5. Update related pages across \`wiki/topics/\`, \`wiki/entities/\`, \`wiki/concepts/\`, and \`wiki/questions/\`.
+5. Route related pages into the most specific \`wiki/\` category from \`docs/llm-wiki-routing.md\`; fall back to \`wiki/topics/\`, \`wiki/entities/\`, \`wiki/concepts/\`, and \`wiki/questions/\` only when no topic routing guide exists.
 6. Update \`wiki/index.md\` and \`wiki/log.md\`.
 7. Use the \`llm-wiki-lint\` skill to health-check the wiki.
 `
@@ -59,7 +59,7 @@ Use this skill when answering questions against a local LLM wiki vault.
 
 ## Workflow
 
-1. Read \`wiki/index.md\`.
+1. Read \`wiki/index.md\` and \`docs/llm-wiki-routing.md\` when present.
 2. Search \`wiki/\` with \`rg\`.
 3. Read matching source, topic, entity, concept, and question pages.
 4. Answer with citations to wiki page paths.

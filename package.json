@@ -23,7 +23,8 @@
     "test": "npm run build && vitest run",
     "pack:dry-run": "npm run build && npm pack --dry-run --cache .tmp/npm-cache",
     "smoke": "npm run build && node -e \"fs.rmSync('.tmp/smoke', { recursive: true, force: true })\" && node bin/llm-wiki-skills init --root .tmp/smoke --host codex --quiet && node bin/llm-wiki-skills status --root .tmp/smoke --json",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:init": "rm -rf .tmp/test && bin/llm-wiki-skills init --root .tmp/test"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

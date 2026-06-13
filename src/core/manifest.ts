@@ -3,8 +3,9 @@ import { readFile } from "node:fs/promises";
 import { ManifestMismatchError, RequiredFileMissingError } from "./errors.js";
 import { atomicWriteText, pathExists, stableJson } from "./fs.js";
 import { getHostAdapters } from "./hosts.js";
+import { isTopicSelectionId, isTopicTemplateId } from "./topic-templates.js";
 import { REQUIRED_DIRECTORIES, sharedReferenceFilePaths, starterFilePaths } from "./vault-contract.js";
-import type { HostId, Manifest, StatusReport } from "./types.js";
+import type { HostId, Manifest, ManifestTopicMetadata, StatusReport } from "./types.js";
 
 export const MANIFEST_PATH = ".llm-wiki-skills.json";
 
@@ -18,14 +19,16 @@ export function requiredFileRegistry(hosts: HostId[]): string[] {
   return [...files].sort();
 }
 
-export function buildManifest(hosts: HostId[]): Manifest {
-  return {
+export function buildManifest(hosts: HostId[], topic?: ManifestTopicMetadata): Manifest {
+  const manifest: Manifest = {
     manifestVersion: 1,
     createdBy: "llm-wiki-skills",
     hosts: [...hosts].sort(),
     directories: [...REQUIRED_DIRECTORIES].sort(),
     files: requiredFileRegistry(hosts)
   };
+  if (topic) manifest.topic = topic;
+  return manifest;
 }
 
 export async function writeManifest(root: string, hosts: HostId[]): Promise<void> {
@@ -72,6 +75,7 @@ export async function buildStatusReport(root: string): Promise<StatusReport> {
     root,
     manifestPath: MANIFEST_PATH,
     hosts: manifest.hosts,
+    topic: manifest.topic,
     checkedFiles: manifestFiles,
     missingFiles,
     extraManifestFiles,
@@ -102,11 +106,41 @@ function validateManifest(value: unknown): Manifest {
   if (!files.every((file): file is string => typeof file === "string")) {
     throw new ManifestMismatchError(`${MANIFEST_PATH} contains an invalid file path.`);
   }
+  const topic = validateManifestTopic(record.topic);
   return {
     manifestVersion: 1,
     createdBy: "llm-wiki-skills",
     hosts: [...new Set(hosts)].sort(),
     directories: [...directories].sort(),
-    files: [...files].sort()
+    files: [...files].sort(),
+    ...(topic ? { topic } : {})
+  };
+}
+
+function validateManifestTopic(value: unknown): ManifestTopicMetadata | undefined {
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== "object") {
+    throw new ManifestMismatchError(`${MANIFEST_PATH} contains an invalid topic metadata object.`);
+  }
+  const record = value as Record<string, unknown>;
+  if (typeof record.id !== "string" || !isTopicSelectionId(record.id)) {
+    throw new ManifestMismatchError(`${MANIFEST_PATH} contains an unsupported topic id.`);
+  }
+  if (typeof record.scaffoldId !== "string" || !isTopicTemplateId(record.scaffoldId)) {
+    throw new ManifestMismatchError(`${MANIFEST_PATH} contains an unsupported topic scaffold id.`);
+  }
+  if (record.id !== "custom" && record.scaffoldId !== record.id) {
+    throw new ManifestMismatchError(`${MANIFEST_PATH} contains inconsistent topic metadata.`);
+  }
+  if (record.id === "custom" && record.scaffoldId !== "general") {
+    throw new ManifestMismatchError(`${MANIFEST_PATH} contains inconsistent custom topic metadata.`);
+  }
+  if (record.customTopic !== undefined && typeof record.customTopic !== "string") {
+    throw new ManifestMismatchError(`${MANIFEST_PATH} contains invalid custom topic text.`);
+  }
+  return {
+    id: record.id,
+    scaffoldId: record.scaffoldId,
+    ...(typeof record.customTopic === "string" ? { customTopic: record.customTopic } : {})
   };
 }
