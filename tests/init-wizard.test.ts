@@ -70,7 +70,7 @@ describe("init plan", () => {
   it("uses the same planned paths for preview and execution", async () => {
     const root = await tempRoot("llm-wiki-plan-");
     const plan = buildInitPlan(root, ["codex", "claude-code"]);
-    const plannedPaths = [...plan.topicDirectories.map((directory) => `${directory}/`), ...plan.files.map((file) => file.relativePath)].sort();
+    const plannedPaths = [...plan.topicDirectories.map((directory) => `${directory}/`), ...plan.managedFiles, ...plan.files.map((file) => file.relativePath)].sort();
     const results = await executeInitPlan(plan);
 
     expect(Object.keys(results).sort()).toEqual(plannedPaths);
@@ -89,6 +89,7 @@ describe("init plan", () => {
     expect(second["wiki/overview.md"]).toBe("skipped");
     expect(second["wiki/projects/"]).toBe("skipped");
     expect(second["docs/llm-wiki-routing.md"]).toBe("skipped");
+    expect(second[".gitignore"]).toBe("skipped");
     expect(second[".llm-wiki-skills.json"]).toBe("created");
   });
 });
@@ -101,8 +102,13 @@ describe("init preview", () => {
     expect(preview).toContain("Root  /tmp/wiki");
     expect(preview).toContain("Codex");
     expect(preview).toContain("Topic General wiki");
+    expect(preview).toContain("Obsidian enabled");
     expect(preview).toContain("Topic directories");
     expect(preview).toContain("Topic routing files");
+    expect(preview).toContain("Obsidian vault settings");
+    expect(preview).toContain(".obsidian/graph.json");
+    expect(preview).toContain("Managed repo hygiene");
+    expect(preview).toContain(".gitignore");
     expect(preview).toContain("wiki/projects/");
     expect(preview).toContain("docs/llm-wiki-routing.md");
     expect(preview).toContain(".agents/skills/llm-wiki-ingest/SKILL.md");
@@ -229,8 +235,20 @@ describe("init wizard", () => {
 
     expect(plan.hosts).toEqual(["claude-code"]);
     expect(plan.topic.id).toBe("product-builder");
+    expect(plan.obsidianEnabled).toBe(true);
     expect(write.mock.calls.join("\n")).toContain("LLM Wiki init preview");
     expect(write.mock.calls.join("\n")).toContain("Product builder");
+  });
+
+  it("lets the wizard opt out of Obsidian setup", async () => {
+    const { runtime, write } = scriptedRuntime({ hosts: ["codex"], obsidian: false, confirm: true });
+
+    const plan = await runInitWizard("/tmp/wiki", runtime);
+
+    expect(plan.obsidianEnabled).toBe(false);
+    expect(plan.files.map((file) => file.relativePath)).not.toContain(".obsidian/graph.json");
+    expect(plan.managedFiles).toEqual([]);
+    expect(write.mock.calls.join("\n")).toContain("Obsidian disabled");
   });
 
   it("uses a fixed topic when command-line topic options were already provided", async () => {

@@ -9,30 +9,33 @@ export async function initCommand(options: CommandOptions): Promise<void> {
   const plan = await resolveInitPlan(options);
   const results = await executeInitPlan(plan);
   const customHandoffPrompt = buildCustomTopicHandoffPrompt(plan.topic);
+  const obsidianHandoff = buildObsidianHandoff(plan.obsidianEnabled);
 
   printResult(
     {
       root: plan.root,
       hosts: plan.hosts,
       topic: plan.topic,
+      obsidian: plan.obsidianEnabled,
       files: results,
+      ...(obsidianHandoff ? { obsidianHandoff } : {}),
       ...(customHandoffPrompt ? { customHandoffPrompt } : {})
     },
     options.json,
     options.quiet,
-    `${renderInitReport(results)}${customHandoffPrompt ? `\n${customHandoffPrompt}\n` : ""}`
+    `${renderInitReport(results, obsidianHandoff)}${customHandoffPrompt ? `\n${customHandoffPrompt}\n` : ""}`
   );
 }
 
 async function resolveInitPlan(options: CommandOptions): Promise<InitPlan> {
   const topic = resolveTopicSelection(options);
-  if (options.hosts.length > 0) return buildInitPlan(options.root, options.hosts, topic);
+  if (options.hosts.length > 0) return buildInitPlan(options.root, options.hosts, topic, options.obsidian ?? true);
   if (options.json || options.quiet) throw new HostRequiredError();
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
     if (!process.env.LLM_WIKI_SKILLS_TEST_PROMPTS) throw new HostRequiredError();
   }
   const { runInitWizard } = await import("../init-wizard.js");
-  return runInitWizard(options.root, undefined, topicWasProvided(options) ? topic : undefined);
+  return runInitWizard(options.root, undefined, topicWasProvided(options) ? topic : undefined, options.obsidian);
 }
 
 export function resolveTopicSelection(options: Pick<CommandOptions, "topicValues" | "templateValues" | "customTopic">): ResolvedTopicSelection {
@@ -93,4 +96,9 @@ function buildCustomTopicHandoffPrompt(topic: ResolvedTopicSelection): string | 
     "Use the generated general scaffold and docs/llm-wiki-routing.md. Propose small source-grounded routing refinements under wiki/ without overwriting existing files.",
     "Do not overwrite existing files. Keep raw evidence under raw/ and cite source pages from synthesized wiki pages."
   ].join("\n");
+}
+
+function buildObsidianHandoff(enabled: boolean): string | undefined {
+  if (!enabled) return undefined;
+  return "Open this folder as a vault. Native graph is configured for `path:wiki/`; personal workspace files are ignored in `.gitignore`.";
 }

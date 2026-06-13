@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { initCommand } from "./commands/init.js";
 import { statusCommand } from "./commands/status.js";
-import { LlmWikiError } from "../core/errors.js";
+import { ConflictingObsidianOptionError, LlmWikiError } from "../core/errors.js";
 import { parseHostValues } from "../core/hosts.js";
 import type { CommandOptions } from "../core/types.js";
 
@@ -34,6 +34,8 @@ export function parseCommand(argv: string[]): { command: string; options: Comman
   if (!COMMANDS.has(command)) return { command, options: defaults() };
   const options = defaults();
   const hostValues: string[] = [];
+  let obsidianEnabled = false;
+  let obsidianDisabled = false;
   while (args.length > 0) {
     const arg = args.shift();
     if (arg === "--root") {
@@ -62,10 +64,17 @@ export function parseCommand(argv: string[]): { command: string; options: Comman
       options.debug = true;
     } else if (arg === "--quiet") {
       options.quiet = true;
+    } else if (arg === "--obsidian") {
+      obsidianEnabled = true;
+      options.obsidian = true;
+    } else if (arg === "--no-obsidian") {
+      obsidianDisabled = true;
+      options.obsidian = false;
     } else {
       throw new Error(`Unknown option: ${arg}`);
     }
   }
+  if (obsidianEnabled && obsidianDisabled) throw new ConflictingObsidianOptionError();
   options.hosts = parseHostValues(hostValues);
   return { command, options };
 }
@@ -90,7 +99,7 @@ Codex or Claude Code to ingest sources, answer from the wiki, and
 health-check the wiki over time.
 
 Usage:
-  llm-wiki-skills init [--root DIR] [--host codex|claude-code] [--topic ID] [--json] [--quiet]
+  llm-wiki-skills init [--root DIR] [--host codex|claude-code] [--topic ID] [--obsidian|--no-obsidian] [--json] [--quiet]
   llm-wiki-skills status [--root DIR] [--json] [--quiet]
 
 Hosts:

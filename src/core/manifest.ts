@@ -3,31 +3,36 @@ import { readFile } from "node:fs/promises";
 import { ManifestMismatchError, RequiredFileMissingError } from "./errors.js";
 import { atomicWriteText, pathExists, stableJson } from "./fs.js";
 import { getHostAdapters } from "./hosts.js";
+import { obsidianGeneratedFilePaths, obsidianIntegrationMetadata } from "./obsidian.js";
 import { isTopicSelectionId, isTopicTemplateId } from "./topic-templates.js";
 import { REQUIRED_DIRECTORIES, sharedReferenceFilePaths, starterFilePaths } from "./vault-contract.js";
-import type { HostId, Manifest, ManifestTopicMetadata, StatusReport } from "./types.js";
+import type { HostId, Manifest, ManifestIntegrations, ManifestTopicMetadata, StatusReport } from "./types.js";
 
 export const MANIFEST_PATH = ".llm-wiki-skills.json";
 
-export function requiredFileRegistry(hosts: HostId[]): string[] {
+export function requiredFileRegistry(hosts: HostId[], integrations?: ManifestIntegrations): string[] {
   const files = new Set<string>([...starterFilePaths(), ...sharedReferenceFilePaths()]);
   for (const adapter of getHostAdapters(hosts)) {
     for (const skill of adapter.skills) {
       files.add(`${adapter.skillRoot}/${skill.name}/SKILL.md`);
     }
   }
+  if (integrations?.obsidian?.enabled) {
+    for (const file of obsidianGeneratedFilePaths()) files.add(file);
+  }
   return [...files].sort();
 }
 
-export function buildManifest(hosts: HostId[], topic?: ManifestTopicMetadata): Manifest {
+export function buildManifest(hosts: HostId[], topic?: ManifestTopicMetadata, integrations?: ManifestIntegrations): Manifest {
   const manifest: Manifest = {
     manifestVersion: 1,
     createdBy: "llm-wiki-skills",
     hosts: [...hosts].sort(),
     directories: [...REQUIRED_DIRECTORIES].sort(),
-    files: requiredFileRegistry(hosts)
+    files: requiredFileRegistry(hosts, integrations)
   };
   if (topic) manifest.topic = topic;
+  if (integrations) manifest.integrations = integrations;
   return manifest;
 }
 
@@ -52,7 +57,7 @@ export async function loadManifest(root: string): Promise<Manifest> {
 
 export async function buildStatusReport(root: string): Promise<StatusReport> {
   const manifest = await loadManifest(root);
-  const expectedFiles = requiredFileRegistry(manifest.hosts);
+  const expectedFiles = requiredFileRegistry(manifest.hosts, manifest.integrations);
   const manifestFiles = [...manifest.files].sort();
   const missingManifestFiles = expectedFiles.filter((file) => !manifestFiles.includes(file));
   const extraManifestFiles = manifestFiles.filter((file) => !expectedFiles.includes(file));
@@ -76,6 +81,7 @@ export async function buildStatusReport(root: string): Promise<StatusReport> {
     manifestPath: MANIFEST_PATH,
     hosts: manifest.hosts,
     topic: manifest.topic,
+    integrations: manifest.integrations,
     checkedFiles: manifestFiles,
     missingFiles,
     extraManifestFiles,
@@ -107,13 +113,15 @@ function validateManifest(value: unknown): Manifest {
     throw new ManifestMismatchError(`${MANIFEST_PATH} contains an invalid file path.`);
   }
   const topic = validateManifestTopic(record.topic);
+  const integrations = validateManifestIntegrations(record.integrations);
   return {
     manifestVersion: 1,
     createdBy: "llm-wiki-skills",
     hosts: [...new Set(hosts)].sort(),
     directories: [...directories].sort(),
     files: [...files].sort(),
-    ...(topic ? { topic } : {})
+    ...(topic ? { topic } : {}),
+    ...(integrations ? { integrations } : {})
   };
 }
 
@@ -142,5 +150,37 @@ function validateManifestTopic(value: unknown): ManifestTopicMetadata | undefine
     id: record.id,
     scaffoldId: record.scaffoldId,
     ...(typeof record.customTopic === "string" ? { customTopic: record.customTopic } : {})
+  };
+}
+
+function validateManifestIntegrations(value: unknown): ManifestIntegrations | undefined {
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== "object") {
+    throw new ManifestMismatchError(`${MANIFEST_PATH} contains an invalid integrations object.`);
+  }
+  const record = value as Record<string, unknown>;
+  if (record.obsidian === undefined) return undefined;
+  if (!record.obsidian || typeof record.obsidian !== "object") {
+    throw new ManifestMismatchError(`${MANIFEST_PATH} contains an invalid Obsidian integration object.`);
+  }
+  const obsidian = record.obsidian as Record<string, unknown>;
+  if (obsidian.enabled !== true || obsidian.schemaVersion !== 1 || !Array.isArray(obsidian.generatedFiles)) {
+    throw new ManifestMismatchError(`${MANIFEST_PATH} contains unsupported Obsidian integration metadata.`);
+  }
+  const generatedFiles = obsidian.generatedFiles;
+  if (!generatedFiles.every((file): file is string => typeof file === "string")) {
+    throw new ManifestMismatchError(`${MANIFEST_PATH} contains invalid Obsidian generated file paths.`);
+  }
+  const expected = obsidianIntegrationMetadata().generatedFiles;
+  const normalized = [...new Set(generatedFiles)].sort();
+  if (normalized.join("\0") !== expected.join("\0")) {
+    throw new ManifestMismatchError(`${MANIFEST_PATH} contains unsupported Obsidian generated file paths.`);
+  }
+  return {
+    obsidian: {
+      enabled: true,
+      schemaVersion: 1,
+      generatedFiles: normalized
+    }
   };
 }

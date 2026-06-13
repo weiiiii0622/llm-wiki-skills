@@ -11,6 +11,7 @@ export class LlmWikiError extends Error {
       | "InvalidHostError"
       | "InvalidTopicError"
       | "ConflictingTopicOptionError"
+      | "ConflictingObsidianOptionError"
       | "HostRequiredError"
       | "HostSelectionCanceledError"
       | "RequiredFileMissingError"
@@ -80,6 +81,12 @@ export class InvalidTopicError extends LlmWikiError {
 export class ConflictingTopicOptionError extends LlmWikiError {
   constructor(message: string) {
     super("ConflictingTopicOptionError", message, 15);
+  }
+}
+
+export class ConflictingObsidianOptionError extends LlmWikiError {
+  constructor(message = "Conflicting Obsidian options: use either --obsidian or --no-obsidian, not both.") {
+    super("ConflictingObsidianOptionError", message, 16);
   }
 }
 

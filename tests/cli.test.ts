@@ -14,9 +14,39 @@ describe("cli", () => {
     await expect(readFile(path.join(root, ".agents/skills/llm-wiki-query/SKILL.md"), "utf8")).resolves.toContain("# LLM Wiki Query");
     await expect(readFile(path.join(root, ".agents/skills/llm-wiki-lint/SKILL.md"), "utf8")).resolves.toContain("# LLM Wiki Lint");
     await expect(readFile(path.join(root, ".claude/skills/llm-wiki-ingest/SKILL.md"), "utf8")).rejects.toThrow();
+    await expect(readFile(path.join(root, ".obsidian/graph.json"), "utf8")).resolves.toContain('"search": "path:wiki/"');
+    await expect(readFile(path.join(root, ".gitignore"), "utf8")).resolves.toContain("# llm-wiki-skills: obsidian start");
 
     const manifest = JSON.parse(await readFile(path.join(root, ".llm-wiki-skills.json"), "utf8"));
     expect(manifest.hosts).toEqual(["codex"]);
+    expect(manifest.integrations).toMatchObject({ obsidian: { enabled: true, schemaVersion: 1 } });
+    expect(manifest.files).toContain(".obsidian/graph.json");
+  });
+
+  it("init --no-obsidian skips Obsidian files and integration metadata", async () => {
+    const root = await tempRoot("llm-wiki-no-obsidian-");
+    const result = await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--no-obsidian", "--json"], fixedEnv());
+
+    const output = JSON.parse(result.stdout);
+    expect(output.obsidian).toBe(false);
+    expect(output.files[".gitignore"]).toBeUndefined();
+    await expect(readFile(path.join(root, ".obsidian/graph.json"), "utf8")).rejects.toThrow();
+
+    const manifest = JSON.parse(await readFile(path.join(root, ".llm-wiki-skills.json"), "utf8"));
+    expect(manifest.integrations).toBeUndefined();
+    expect(manifest.files).not.toContain(".obsidian/graph.json");
+
+    const status = await execaNode(["dist/cli/index.js", "status", "--root", root, "--json"], fixedEnv());
+    expect(JSON.parse(status.stdout)).toMatchObject({ status: "pass", hosts: ["codex"] });
+  });
+
+  it("conflicting Obsidian flags fail", async () => {
+    const root = await tempRoot("llm-wiki-obsidian-conflict-");
+    const result = await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--obsidian", "--no-obsidian"], fixedEnv(), false);
+
+    expect(result.exitCode).toBe(16);
+    expect(result.stderr).toContain("Conflicting Obsidian options");
+    expectProjectErrorCodeHidden(result.stderr);
   });
 
   it("init --host claude-code generates Claude assets only", async () => {
@@ -152,9 +182,29 @@ describe("cli", () => {
     const result = await execaNode(["dist/cli/index.js", "init", "--root", root], fixedEnv({ hosts: ["codex"], confirm: true }));
 
     expect(result.stdout).toContain("LLM Wiki init preview");
+    expect(result.stdout).toContain("Obsidian enabled");
     expect(result.stdout).toContain(".agents/skills/llm-wiki-ingest/SKILL.md");
-    expect(result.stdout).toContain("Initialized llm-wiki local skills.");
+    expect(result.stdout).toContain(".obsidian/graph.json");
+    expect(result.stdout).toContain("◆ LLM Wiki is ready.");
     await expect(readFile(path.join(root, ".agents/skills/llm-wiki-ingest/SKILL.md"), "utf8")).resolves.toContain("# LLM Wiki Ingest");
+  });
+
+  it("human init output summarizes changes without dumping every path status", async () => {
+    const root = await tempRoot("llm-wiki-human-output-");
+    const result = await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--topic", "medical"], fixedEnv());
+
+    expect(result.stdout).toContain("◆ LLM Wiki is ready.");
+    expect(result.stdout).toContain("● Changed: 28 created, 0 updated, 3 left alone.");
+    expect(result.stdout).toContain("✓ Set up");
+    expect(result.stdout).toContain("  • Agent skills");
+    expect(result.stdout).toContain("  • Wiki pages and topic folders");
+    expect(result.stdout).toContain("  • Obsidian vault settings");
+    expect(result.stdout).toContain("○ Left alone");
+    expect(result.stdout).toContain("  • wiki/questions/");
+    expect(result.stdout).toContain("◇ Obsidian");
+    expect(result.stdout).toContain("→ Next\n  npx llm-wiki-skills status");
+    expect(result.stdout).not.toContain("Paths:");
+    expect(result.stdout).not.toContain("- created .agents/skills/llm-wiki-ingest/SKILL.md");
   });
 
   it("interactive init writes both hosts after confirmation", async () => {
@@ -215,7 +265,8 @@ describe("cli", () => {
     const json = await execaNode(["dist/cli/index.js", "init", "--root", jsonRoot, "--host", "codex", "--json"], fixedEnv());
     const quiet = await execaNode(["dist/cli/index.js", "init", "--root", quietRoot, "--host", "codex", "--quiet"], fixedEnv());
 
-    expect(JSON.parse(json.stdout)).toMatchObject({ root: jsonRoot, hosts: ["codex"], topic: { id: "general", scaffoldId: "general" } });
+    expect(JSON.parse(json.stdout)).toMatchObject({ root: jsonRoot, hosts: ["codex"], topic: { id: "general", scaffoldId: "general" }, obsidian: true });
+    expect(JSON.parse(json.stdout).obsidianHandoff).toContain("Native graph is configured");
     expect(json.stdout).not.toMatch(/\x1b\[/);
     expect(quiet.stdout).toBe("");
     expect(quiet.stderr).toBe("");
@@ -278,7 +329,23 @@ describe("cli", () => {
     const root = await tempRoot("llm-wiki-status-");
     await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--quiet"], fixedEnv());
     const status = await execaNode(["dist/cli/index.js", "status", "--root", root, "--json"], fixedEnv());
-    expect(JSON.parse(status.stdout)).toMatchObject({ status: "pass", hosts: ["codex"], topic: { id: "general", scaffoldId: "general" } });
+    expect(JSON.parse(status.stdout)).toMatchObject({
+      status: "pass",
+      hosts: ["codex"],
+      topic: { id: "general", scaffoldId: "general" },
+      integrations: { obsidian: { enabled: true } }
+    });
+  });
+
+  it("status fails for a missing Obsidian generated file when integration is enabled", async () => {
+    const root = await tempRoot("llm-wiki-missing-obsidian-");
+    await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--quiet"], fixedEnv());
+    await rm(path.join(root, ".obsidian/graph.json"));
+
+    const result = await execaNode(["dist/cli/index.js", "status", "--root", root], fixedEnv(), false);
+    expect(result.exitCode).toBe(12);
+    expect(result.stderr).toContain("Required file missing: .obsidian/graph.json");
+    expectProjectErrorCodeHidden(result.stderr);
   });
 
   it("status passes after deleting optional topic scaffold pages", async () => {
@@ -346,8 +413,10 @@ describe("cli", () => {
     const root = await tempRoot("llm-wiki-existing-");
     await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--quiet"], fixedEnv());
     await writeFile(path.join(root, "wiki/overview.md"), "custom overview\n", "utf8");
+    await writeFile(path.join(root, ".obsidian/graph.json"), "custom graph\n", "utf8");
     await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--quiet"], fixedEnv());
     await expect(readFile(path.join(root, "wiki/overview.md"), "utf8")).resolves.toBe("custom overview\n");
+    await expect(readFile(path.join(root, ".obsidian/graph.json"), "utf8")).resolves.toBe("custom graph\n");
   });
 
   it("rerun init skips edited topic scaffold files and adds missing optional scaffold pages", async () => {
@@ -382,6 +451,6 @@ async function tempRoot(prefix: string): Promise<string> {
 
 function expectProjectErrorCodeHidden(stderr: string): void {
   expect(stderr).not.toMatch(
-    /(VaultNotFoundError|InvalidFrontmatterError|BrokenLinkError|GraphDriftError|ImmutableRawViolationError|WriteConflictError|PackageAssetMissingError|InvalidHostError|InvalidTopicError|ConflictingTopicOptionError|HostRequiredError|HostSelectionCanceledError|RequiredFileMissingError|ManifestMismatchError):/
+    /(VaultNotFoundError|InvalidFrontmatterError|BrokenLinkError|GraphDriftError|ImmutableRawViolationError|WriteConflictError|PackageAssetMissingError|InvalidHostError|InvalidTopicError|ConflictingTopicOptionError|ConflictingObsidianOptionError|HostRequiredError|HostSelectionCanceledError|RequiredFileMissingError|ManifestMismatchError):/
   );
 }

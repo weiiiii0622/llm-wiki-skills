@@ -1,9 +1,34 @@
-import type { HealthReport, StatusReport, ValidationIssue, WikiGraph, WikiPage } from "./types.js";
+import type { HealthReport, InitWriteStatus, StatusReport, ValidationIssue, WikiGraph, WikiPage } from "./types.js";
 
-export function renderInitReport(results: Record<string, "created" | "skipped">): string {
-  const created = Object.entries(results).filter(([, status]) => status === "created").length;
-  const skipped = Object.entries(results).filter(([, status]) => status === "skipped").length;
-  return `Initialized llm-wiki local skills.\nCreated: ${created}\nSkipped existing paths: ${skipped}\nNext: run \`npx llm-wiki-skills status\`.\n`;
+export function renderInitReport(results: Record<string, InitWriteStatus>, obsidianHandoff?: string): string {
+  const entries = Object.entries(results).sort(([a], [b]) => a.localeCompare(b));
+  const created = entries.filter(([, status]) => status === "created");
+  const updated = entries.filter(([, status]) => status === "updated");
+  const skipped = entries.filter(([, status]) => status === "skipped");
+  const setup = setupSummary(entries);
+  return [
+    "◆ LLM Wiki is ready.",
+    "",
+    `● Changed: ${countLabel(created.length, "created")}, ${countLabel(updated.length, "updated")}, ${countLabel(skipped.length, "left alone")}.`,
+    "",
+    setup.length > 0 ? "✓ Set up" : undefined,
+    ...setup.map((line) => `  • ${line}`),
+    skipped.length > 0 ? "" : undefined,
+    skipped.length > 0 ? "○ Left alone" : undefined,
+    ...skipped.map(([file]) => `  • ${file}`),
+    updated.length > 0 ? "" : undefined,
+    updated.length > 0 ? "↻ Updated" : undefined,
+    ...updated.map(([file]) => `  • ${file}`),
+    obsidianHandoff ? "" : undefined,
+    obsidianHandoff ? "◇ Obsidian" : undefined,
+    obsidianHandoff ? `  ${formatObsidianHandoff(obsidianHandoff)}` : undefined,
+    "",
+    "→ Next",
+    "  npx llm-wiki-skills status"
+  ]
+    .filter((line): line is string => line !== undefined)
+    .join("\n")
+    .concat("\n");
 }
 
 export function renderStatusReport(report: StatusReport): string {
@@ -13,6 +38,7 @@ export function renderStatusReport(report: StatusReport): string {
     `Manifest: ${report.manifestPath}`,
     `Hosts: ${report.hosts.join(", ")}`,
     `Topic: ${report.topic?.id ?? "unknown"}`,
+    `Obsidian: ${report.integrations?.obsidian?.enabled ? "enabled" : "not configured"}`,
     `Checked files: ${report.checkedFiles.length}`,
     ""
   ].join("\n");
@@ -79,4 +105,24 @@ function recordLines(record: Record<string, number>): string[] {
 
 function sortRecord(record: Record<string, number>): Record<string, number> {
   return Object.fromEntries(Object.entries(record).sort(([a], [b]) => a.localeCompare(b)));
+}
+
+function countLabel(count: number, label: string): string {
+  return `${count} ${label}`;
+}
+
+function setupSummary(entries: Array<[string, InitWriteStatus]>): string[] {
+  const paths = entries.filter(([, status]) => status !== "skipped").map(([file]) => file);
+  const lines: string[] = [];
+  if (paths.some((file) => file.startsWith(".agents/skills/") || file.startsWith(".claude/skills/"))) lines.push("Agent skills");
+  if (paths.some((file) => file.startsWith("wiki/") || file === "docs/llm-wiki-routing.md")) lines.push("Wiki pages and topic folders");
+  if (paths.some((file) => file === "docs/llm-wiki-contract.md" || file === "docs/llm-wiki-workflows.md")) lines.push("Reference docs");
+  if (paths.some((file) => file.startsWith(".obsidian/"))) lines.push("Obsidian vault settings");
+  if (paths.includes(".gitignore")) lines.push(".gitignore runtime rules");
+  if (paths.includes(".llm-wiki-skills.json")) lines.push("Install manifest");
+  return lines;
+}
+
+function formatObsidianHandoff(value: string): string {
+  return value.replace(/^Obsidian:\s*/, "");
 }

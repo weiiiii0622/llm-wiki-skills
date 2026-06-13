@@ -1,12 +1,14 @@
 import type { TopicSelectionId, TopicTemplateId } from "./topic-templates.js";
 
 export type OutputMode = "human" | "json";
+export type InitWriteStatus = "created" | "updated" | "skipped";
 
 export interface CommandOptions {
   root: string;
   json: boolean;
   debug: boolean;
   quiet: boolean;
+  obsidian?: boolean;
   hosts: HostId[];
   topicValues: string[];
   templateValues: string[];
@@ -34,12 +36,21 @@ export interface Manifest {
   directories: string[];
   files: string[];
   topic?: ManifestTopicMetadata;
+  integrations?: ManifestIntegrations;
 }
 
 export interface ManifestTopicMetadata {
   id: TopicSelectionId;
   scaffoldId: TopicTemplateId;
   customTopic?: string;
+}
+
+export interface ManifestIntegrations {
+  obsidian?: {
+    enabled: true;
+    schemaVersion: 1;
+    generatedFiles: string[];
+  };
 }
 
 export interface WikiPage {
@@ -113,6 +124,7 @@ export interface StatusReport {
   manifestPath: string;
   hosts: HostId[];
   topic?: ManifestTopicMetadata;
+  integrations?: ManifestIntegrations;
   checkedFiles: string[];
   missingFiles: string[];
   extraManifestFiles: string[];

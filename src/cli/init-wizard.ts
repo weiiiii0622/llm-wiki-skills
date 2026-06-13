@@ -8,6 +8,7 @@ import { createPromptRuntime, hostPromptChoices, type PromptRuntime, type TopicP
 export interface InitPreviewModel {
   root: string;
   hosts: string[];
+  obsidian: boolean;
   topic: {
     id: TopicSelectionId;
     label: string;
@@ -18,7 +19,7 @@ export interface InitPreviewModel {
 }
 
 export interface InitPreviewGroup {
-  id: InitFileGroupId | "topic-directory";
+  id: InitFileGroupId | "topic-directory" | "managed";
   label: string;
   files: string[];
 }
@@ -30,12 +31,14 @@ export interface RenderInitPreviewOptions {
 export async function runInitWizard(
   root: string,
   runtime: PromptRuntime = createPromptRuntime(),
-  fixedTopic?: ResolvedTopicSelection
+  fixedTopic?: ResolvedTopicSelection,
+  fixedObsidianEnabled?: boolean
 ): Promise<InitPlan> {
   runtime.enterScrollableScreen();
   const hosts = await runtime.selectHosts(hostPromptChoices());
   const topic = fixedTopic ?? (await selectTopic(runtime));
-  const plan = buildInitPlan(root, hosts, topic);
+  const obsidianEnabled = fixedObsidianEnabled ?? (await runtime.confirm("Set up Obsidian vault metadata and graph view?", true));
+  const plan = buildInitPlan(root, hosts, topic, obsidianEnabled);
   runtime.write(renderInitPreview(buildInitPreviewModel(plan), { decorated: runtime.decorated }));
   const confirmed = await runtime.confirm("Create these LLM Wiki skill files?", true);
   if (!confirmed) throw new HostSelectionCanceledError();
@@ -47,6 +50,7 @@ export function buildInitPreviewModel(plan: InitPlan): InitPreviewModel {
   return {
     root: plan.root,
     hosts: plan.hosts.map(hostLabel),
+    obsidian: plan.obsidianEnabled,
     topic: {
       id: plan.topic.id,
       label: plan.topic.label,
@@ -59,11 +63,16 @@ export function buildInitPreviewModel(plan: InitPlan): InitPreviewModel {
         label: "Topic directories",
         files: plan.topicDirectories.map((directory) => `${directory}/`).sort()
       },
-      ...(["starter", "topic", "host", "shared", "manifest"] as const).map((id) => ({
+      ...(["starter", "topic", "host", "shared", "obsidian", "manifest"] as const).map((id) => ({
         id,
         label: groupLabel(id),
         files: grouped[id].map((file) => file.relativePath).sort()
-      }))
+      })),
+      {
+        id: "managed" as const,
+        label: "Managed repo hygiene",
+        files: plan.managedFiles
+      }
     ]
   };
 }
@@ -76,6 +85,7 @@ export function renderInitPreview(model: InitPreviewModel, options: RenderInitPr
     `${ui.dim("Root")}  ${model.root}`,
     `${ui.dim("Hosts")} ${model.hosts.join(", ")}`,
     `${ui.dim("Topic")} ${model.topic.label}${model.topic.customTopic ? `: ${model.topic.customTopic}` : ""}`,
+    `${ui.dim("Obsidian")} ${model.obsidian ? "enabled" : "disabled"}`,
     `${ui.dim("Examples")} ${model.topic.examples.join(", ")}`,
     "",
     ui.bold("Files to create or update:")
@@ -104,6 +114,8 @@ function groupLabel(group: InitFileGroupId): string {
       return "Agent skill files";
     case "shared":
       return "Shared references";
+    case "obsidian":
+      return "Obsidian vault settings";
     case "manifest":
       return "Install manifest";
   }

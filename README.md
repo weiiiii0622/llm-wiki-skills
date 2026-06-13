@@ -32,6 +32,14 @@ Check that the local install is complete:
 npx llm-wiki-skills status
 ```
 
+By default, `init` also makes the folder ready to open as an Obsidian vault:
+
+```sh
+npx llm-wiki-skills init --host codex
+```
+
+Use `--no-obsidian` if you only want the agent skills and markdown wiki files.
+
 ## How You Use It
 
 After `init`, ask your agent to use one of the installed skills.
@@ -63,10 +71,26 @@ raw/                         preserved source material
 wiki/                        durable markdown knowledge
 docs/llm-wiki-contract.md    local wiki rules
 docs/llm-wiki-workflows.md   ingest/query/lint workflow reference
+.obsidian/                   stable Obsidian vault settings
 .llm-wiki-skills.json        install manifest for status checks
 ```
 
 For Codex, it writes repo-scoped skills under `.agents/skills/`. For Claude Code, it writes project skills under `.claude/skills/`. Existing files are skipped on rerun so local edits are not overwritten.
+
+## Obsidian Vault Support
+
+Obsidian support is enabled by default. The generated vault includes stable settings for app behavior, core plugins, native graph view, and an ownership marker at `.obsidian/llm-wiki-skills.json`.
+
+The graph view is scoped to `path:wiki/` so Obsidian's native graph focuses on synthesized wiki pages while raw evidence stays available under `raw/`.
+
+`init` also adds a managed `.gitignore` block for Obsidian runtime files such as `.obsidian/workspace.json`. It does not ignore generated stable settings, plugins, themes, or snippets.
+
+Flags:
+
+```sh
+npx llm-wiki-skills init --obsidian
+npx llm-wiki-skills init --no-obsidian
+```
 
 ## Topic Directory Scaffolds
 
