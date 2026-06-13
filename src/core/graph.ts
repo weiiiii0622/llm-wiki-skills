@@ -3,7 +3,7 @@ import { readText, listMarkdownFiles, stableJson, atomicWriteText } from "./fs.j
 import { extractFrontmatter, extractWikilinks, frontmatterArray, pageIdFromPath, slugify, titleFromPath } from "./markdown.js";
 import type { GraphEdge, WikiGraph, WikiPage } from "./types.js";
 
-export const PACKAGE_VERSION = "0.1.2";
+export const PACKAGE_VERSION = "0.1.3";
 
 export async function loadWikiPages(root: string): Promise<WikiPage[]> {
   const files = (await listMarkdownFiles(root, "wiki")).filter((file) => file !== "wiki/graph.md");
