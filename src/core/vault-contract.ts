@@ -3,6 +3,12 @@ import { mkdir } from "node:fs/promises";
 import { pathExists, writeTextIfAbsent } from "./fs.js";
 import { VaultNotFoundError } from "./errors.js";
 
+export interface VaultFileEntry {
+  relativePath: string;
+  content: string;
+  allowRaw?: boolean;
+}
+
 export const REQUIRED_DIRECTORIES = [
   "raw/sources",
   "raw/notes",
@@ -32,22 +38,41 @@ export async function createVaultDirectories(root: string): Promise<void> {
 
 export async function createStarterFiles(root: string): Promise<Record<string, "created" | "skipped">> {
   const results: Record<string, "created" | "skipped"> = {};
-  for (const [relativePath, content] of Object.entries(starterFiles())) {
-    results[relativePath] = await writeTextIfAbsent(root, relativePath, content, relativePath.startsWith("raw/"));
+  for (const entry of starterFileEntries()) {
+    results[entry.relativePath] = await writeTextIfAbsent(root, entry.relativePath, entry.content, entry.allowRaw);
   }
   return results;
 }
 
 export async function createSharedReferenceFiles(root: string): Promise<Record<string, "created" | "skipped">> {
   const results: Record<string, "created" | "skipped"> = {};
-  for (const [relativePath, content] of Object.entries(sharedReferenceFiles())) {
-    results[relativePath] = await writeTextIfAbsent(root, relativePath, content);
+  for (const entry of sharedReferenceFileEntries()) {
+    results[entry.relativePath] = await writeTextIfAbsent(root, entry.relativePath, entry.content, entry.allowRaw);
   }
   return results;
 }
 
 export function sharedReferenceFilePaths(): string[] {
-  return Object.keys(sharedReferenceFiles());
+  return sharedReferenceFileEntries().map((entry) => entry.relativePath);
+}
+
+export function starterFilePaths(): string[] {
+  return starterFileEntries().map((entry) => entry.relativePath);
+}
+
+export function starterFileEntries(): VaultFileEntry[] {
+  return Object.entries(starterFiles()).map(([relativePath, content]) => ({
+    relativePath,
+    content,
+    allowRaw: relativePath.startsWith("raw/")
+  }));
+}
+
+export function sharedReferenceFileEntries(): VaultFileEntry[] {
+  return Object.entries(sharedReferenceFiles()).map(([relativePath, content]) => ({
+    relativePath,
+    content
+  }));
 }
 
 function starterFiles(): Record<string, string> {

@@ -3,24 +3,13 @@ import { readFile } from "node:fs/promises";
 import { ManifestMismatchError, RequiredFileMissingError } from "./errors.js";
 import { atomicWriteText, pathExists, stableJson } from "./fs.js";
 import { getHostAdapters } from "./hosts.js";
-import { REQUIRED_DIRECTORIES, sharedReferenceFilePaths } from "./vault-contract.js";
+import { REQUIRED_DIRECTORIES, sharedReferenceFilePaths, starterFilePaths } from "./vault-contract.js";
 import type { HostId, Manifest, StatusReport } from "./types.js";
 
 export const MANIFEST_PATH = ".llm-wiki-skills.json";
 
-const STARTER_FILE_PATHS = [
-  "wiki/index.md",
-  "wiki/log.md",
-  "wiki/overview.md",
-  "wiki/templates/source.md",
-  "wiki/templates/topic.md",
-  "wiki/templates/entity.md",
-  "wiki/templates/concept.md",
-  "wiki/templates/question.md"
-] as const;
-
 export function requiredFileRegistry(hosts: HostId[]): string[] {
-  const files = new Set<string>([...STARTER_FILE_PATHS, ...sharedReferenceFilePaths()]);
+  const files = new Set<string>([...starterFilePaths(), ...sharedReferenceFilePaths()]);
   for (const adapter of getHostAdapters(hosts)) {
     for (const skill of adapter.skills) {
       files.add(`${adapter.skillRoot}/${skill.name}/SKILL.md`);

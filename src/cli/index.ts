@@ -71,25 +71,35 @@ function defaults(): CommandOptions {
 function usage(): void {
   process.stdout.write(`llm-wiki-skills
 
+Install local LLM Wiki skills for AI agents. The generated skills teach
+Codex or Claude Code to ingest sources, answer from the wiki, and
+health-check the wiki over time.
+
 Usage:
   llm-wiki-skills init [--root DIR] [--host codex|claude-code] [--json] [--quiet]
   llm-wiki-skills status [--root DIR] [--json] [--quiet]
 
+Hosts:
+  codex        writes repo skills to .agents/skills
+  claude-code  writes project skills to .claude/skills
+
 First run:
-  npx llm-wiki-skills init --host codex
+  npx llm-wiki-skills init
 `);
 }
 
 if (isCliEntrypoint()) {
-  main(process.argv.slice(2)).catch((error: unknown) => {
-    if (error instanceof LlmWikiError) {
-      process.stderr.write(`${error.code}: ${error.message}\n`);
-      process.exit(error.exitCode);
-    }
-    const message = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`Error: ${message}\n`);
-    process.exit(1);
-  });
+  main(process.argv.slice(2))
+    .then(() => process.exit(process.exitCode ?? 0))
+    .catch((error: unknown) => {
+      if (error instanceof LlmWikiError) {
+        process.stderr.write(`${error.message}\n`);
+        process.exit(error.exitCode);
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      process.stderr.write(`Error: ${message}\n`);
+      process.exit(1);
+    });
 }
 
 function isCliEntrypoint(): boolean {

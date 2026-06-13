@@ -91,7 +91,7 @@ llm-wiki-skills status [--root DIR] [--json] [--quiet]
 
 `status` verifies the manifest and required files still match the selected hosts.
 
-If `--host` is omitted in a terminal, `init` opens a host selector. In scripts and CI, pass `--host`.
+If `--host` is omitted in an interactive terminal, `init` opens a guided setup: choose host targets, review the files that will be created or refreshed, then confirm before anything is written. In scripts, CI, `--json`, or `--quiet` usage, pass `--host`.
 
 ## Requirements
 
