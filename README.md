@@ -20,28 +20,10 @@ The CLI does not call an LLM, run a hosted service, or create a vector database.
 
 ## Quickstart
 
-Install skills for Codex:
+Enter setup wizard:
 
 ```sh
-npx llm-wiki-skills init --host codex
-```
-
-Install skills for Claude Code:
-
-```sh
-npx llm-wiki-skills init --host claude-code
-```
-
-Install both:
-
-```sh
-npx llm-wiki-skills init --host codex,claude-code
-```
-
-Start with a topic scaffold:
-
-```sh
-npx llm-wiki-skills init --host codex --topic product-builder
+npx llm-wiki-skills init
 ```
 
 Check that the local install is complete:
