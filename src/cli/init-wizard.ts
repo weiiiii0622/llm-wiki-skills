@@ -32,6 +32,7 @@ export async function runInitWizard(
   runtime: PromptRuntime = createPromptRuntime(),
   fixedTopic?: ResolvedTopicSelection
 ): Promise<InitPlan> {
+  runtime.enterScrollableScreen();
   const hosts = await runtime.selectHosts(hostPromptChoices());
   const topic = fixedTopic ?? (await selectTopic(runtime));
   const plan = buildInitPlan(root, hosts, topic);

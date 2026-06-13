@@ -19,6 +19,7 @@ export interface TopicPromptChoice {
 
 export interface PromptRuntime {
   readonly decorated: boolean;
+  enterScrollableScreen(): void;
   enterAlternateScreen(): void;
   exitAlternateScreen(): void;
   write(message: string): void;
@@ -50,6 +51,9 @@ type PromptsFunction = (question: unknown, options?: unknown) => Promise<Record<
 
 export const ENTER_ALTERNATE_SCREEN = "\x1b[?1049h";
 export const EXIT_ALTERNATE_SCREEN = "\x1b[?1049l";
+const CURSOR_HOME = "\x1b[H";
+const DEFAULT_SCREEN_ROWS = 24;
+const MAX_SCREEN_BREAK_ROWS = 200;
 const DEFAULT_TOPIC_OPTIONS_PER_PAGE = 10;
 const MIN_TOPIC_OPTIONS_PER_PAGE = 1;
 const TOPIC_PROMPT_RESERVED_ROWS = 3;
@@ -77,6 +81,9 @@ export function createScriptedPromptRuntime(script: ScriptedPromptAnswers, optio
   const output = options.output ?? process.stdout;
   return {
     decorated: options.decorated ?? false,
+    enterScrollableScreen(): void {
+      if (this.decorated) output.write(scrollableScreenBreak(output));
+    },
     enterAlternateScreen(): void {
       if (this.decorated) output.write(ENTER_ALTERNATE_SCREEN);
     },
@@ -120,6 +127,10 @@ class LibraryPromptRuntime implements PromptRuntime {
 
   write(message: string): void {
     this.output.write(message);
+  }
+
+  enterScrollableScreen(): void {
+    if (this.decorated) this.output.write(scrollableScreenBreak(this.output));
   }
 
   enterAlternateScreen(): void {
@@ -288,6 +299,12 @@ export function topicOptionsPerPage(output: NodeJS.WriteStream, choiceCount: num
   if (!rows) return Math.min(choiceCount, DEFAULT_TOPIC_OPTIONS_PER_PAGE);
   const availableRows = Math.max(MIN_TOPIC_OPTIONS_PER_PAGE, rows - TOPIC_PROMPT_RESERVED_ROWS);
   return Math.min(choiceCount, availableRows);
+}
+
+function scrollableScreenBreak(output: NodeJS.WriteStream): string {
+  const rows = typeof (output as NodeJS.WriteStream & { rows?: unknown }).rows === "number" ? (output as NodeJS.WriteStream & { rows: number }).rows : undefined;
+  const screenRows = rows && rows > 0 ? Math.min(rows, MAX_SCREEN_BREAK_ROWS) : DEFAULT_SCREEN_ROWS;
+  return `${"\n".repeat(screenRows)}${CURSOR_HOME}`;
 }
 
 function isTopicSelection(value: unknown): value is TopicSelectionId {

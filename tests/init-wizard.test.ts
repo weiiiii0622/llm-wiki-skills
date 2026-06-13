@@ -193,22 +193,24 @@ describe("init wizard", () => {
   });
 
   it("keeps decorated wizard output on the main screen so scrollback works", async () => {
-    const { runtime, write } = scriptedRuntime({ hosts: ["codex"], confirm: true }, { decorated: true });
+    const { runtime, write } = scriptedRuntime({ hosts: ["codex"], confirm: true }, { decorated: true, rows: 4 });
 
     await runInitWizard("/tmp/wiki", runtime);
 
     expect(write.mock.calls.join("\n")).not.toContain(ENTER_ALTERNATE_SCREEN);
     expect(write.mock.calls.join("\n")).not.toContain(EXIT_ALTERNATE_SCREEN);
+    expect(write.mock.calls[0]?.[0]).toBe("\n\n\n\n\x1b[H");
     expect(write.mock.calls.join("\n")).toContain("LLM Wiki init preview");
   });
 
   it("keeps canceled decorated wizard output on the main screen", async () => {
-    const { runtime, write } = scriptedRuntime({ hosts: ["codex"], confirm: false }, { decorated: true });
+    const { runtime, write } = scriptedRuntime({ hosts: ["codex"], confirm: false }, { decorated: true, rows: 4 });
 
     await expect(runInitWizard("/tmp/wiki", runtime)).rejects.toBeInstanceOf(HostSelectionCanceledError);
 
     expect(write.mock.calls.join("\n")).not.toContain(ENTER_ALTERNATE_SCREEN);
     expect(write.mock.calls.join("\n")).not.toContain(EXIT_ALTERNATE_SCREEN);
+    expect(write.mock.calls[0]?.[0]).toBe("\n\n\n\n\x1b[H");
   });
 
   it("does not emit terminal screen control codes for undecorated scripted output", async () => {
@@ -270,14 +272,14 @@ async function tempRoot(prefix: string): Promise<string> {
 
 function scriptedRuntime(
   script: Parameters<typeof createScriptedPromptRuntime>[0],
-  options: { decorated?: boolean } = {}
+  options: { decorated?: boolean; rows?: number } = {}
 ): {
   runtime: ReturnType<typeof createScriptedPromptRuntime>;
   write: ReturnType<typeof vi.fn>;
 } {
   const write = vi.fn();
   return {
-    runtime: createScriptedPromptRuntime(script, { output: { write } as unknown as NodeJS.WriteStream, decorated: options.decorated }),
+    runtime: createScriptedPromptRuntime(script, { output: { write, rows: options.rows } as unknown as NodeJS.WriteStream, decorated: options.decorated }),
     write
   };
 }
