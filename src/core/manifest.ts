@@ -4,6 +4,7 @@ import { ManifestMismatchError, RequiredFileMissingError } from "./errors.js";
 import { atomicWriteText, pathExists, stableJson } from "./fs.js";
 import { getHostAdapters } from "./hosts.js";
 import { obsidianGeneratedFilePaths, obsidianIntegrationMetadata } from "./obsidian.js";
+import { qmdGeneratedFilePaths } from "./qmd-metadata.js";
 import { isTopicSelectionId, isTopicTemplateId } from "./topic-templates.js";
 import { REQUIRED_DIRECTORIES, sharedReferenceFilePaths, starterFilePaths } from "./vault-contract.js";
 import type { HostId, Manifest, ManifestIntegrations, ManifestTopicMetadata, StatusReport } from "./types.js";
@@ -19,6 +20,9 @@ export function requiredFileRegistry(hosts: HostId[], integrations?: ManifestInt
   }
   if (integrations?.obsidian?.enabled) {
     for (const file of obsidianGeneratedFilePaths()) files.add(file);
+  }
+  if (integrations?.qmd?.enabled) {
+    for (const file of qmdGeneratedFilePaths()) files.add(file);
   }
   return [...files].sort();
 }
@@ -159,11 +163,21 @@ function validateManifestIntegrations(value: unknown): ManifestIntegrations | un
     throw new ManifestMismatchError(`${MANIFEST_PATH} contains an invalid integrations object.`);
   }
   const record = value as Record<string, unknown>;
-  if (record.obsidian === undefined) return undefined;
-  if (!record.obsidian || typeof record.obsidian !== "object") {
+  const unknown = Object.keys(record).filter((key) => key !== "obsidian" && key !== "qmd");
+  if (unknown.length > 0) {
+    throw new ManifestMismatchError(`${MANIFEST_PATH} contains unsupported integration keys: ${unknown.join(", ")}.`);
+  }
+  const integrations: ManifestIntegrations = {};
+  if (record.obsidian !== undefined) integrations.obsidian = validateObsidianIntegration(record.obsidian);
+  if (record.qmd !== undefined) integrations.qmd = validateQmdIntegration(record.qmd);
+  return integrations.obsidian || integrations.qmd ? integrations : undefined;
+}
+
+function validateObsidianIntegration(value: unknown): NonNullable<ManifestIntegrations["obsidian"]> {
+  if (!value || typeof value !== "object") {
     throw new ManifestMismatchError(`${MANIFEST_PATH} contains an invalid Obsidian integration object.`);
   }
-  const obsidian = record.obsidian as Record<string, unknown>;
+  const obsidian = value as Record<string, unknown>;
   if (obsidian.enabled !== true || obsidian.schemaVersion !== 1 || !Array.isArray(obsidian.generatedFiles)) {
     throw new ManifestMismatchError(`${MANIFEST_PATH} contains unsupported Obsidian integration metadata.`);
   }
@@ -177,10 +191,40 @@ function validateManifestIntegrations(value: unknown): ManifestIntegrations | un
     throw new ManifestMismatchError(`${MANIFEST_PATH} contains unsupported Obsidian generated file paths.`);
   }
   return {
-    obsidian: {
-      enabled: true,
-      schemaVersion: 1,
-      generatedFiles: normalized
-    }
+    enabled: true,
+    schemaVersion: 1,
+    generatedFiles: normalized
+  };
+}
+
+function validateQmdIntegration(value: unknown): NonNullable<ManifestIntegrations["qmd"]> {
+  if (!value || typeof value !== "object") {
+    throw new ManifestMismatchError(`${MANIFEST_PATH} contains an invalid qmd integration object.`);
+  }
+  const qmd = value as Record<string, unknown>;
+  if (
+    qmd.enabled !== true ||
+    qmd.schemaVersion !== 1 ||
+    typeof qmd.collection !== "string" ||
+    typeof qmd.root !== "string" ||
+    typeof qmd.docsPath !== "string" ||
+    qmd.searchMode !== "keyword"
+  ) {
+    throw new ManifestMismatchError(`${MANIFEST_PATH} contains unsupported qmd integration metadata.`);
+  }
+  if (qmd.docsPath !== qmdGeneratedFilePaths()[0]) {
+    throw new ManifestMismatchError(`${MANIFEST_PATH} contains unsupported qmd docs path.`);
+  }
+  if (qmd.lastIndexedAt !== undefined && typeof qmd.lastIndexedAt !== "string") {
+    throw new ManifestMismatchError(`${MANIFEST_PATH} contains invalid qmd last indexed timestamp.`);
+  }
+  return {
+    enabled: true,
+    schemaVersion: 1,
+    collection: qmd.collection,
+    root: qmd.root,
+    docsPath: qmd.docsPath,
+    searchMode: "keyword",
+    ...(typeof qmd.lastIndexedAt === "string" ? { lastIndexedAt: qmd.lastIndexedAt } : {})
   };
 }

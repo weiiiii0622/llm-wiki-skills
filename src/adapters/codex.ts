@@ -35,7 +35,8 @@ Use this skill when adding source material to a local LLM wiki vault.
 4. Extract durable topics, entities, concepts, claims, examples, contradictions, and open questions.
 5. Route related pages into the most specific \`wiki/\` category from \`docs/llm-wiki-routing.md\`; fall back to \`wiki/topics/\`, \`wiki/entities/\`, \`wiki/concepts/\`, and \`wiki/questions/\` only when no topic routing guide exists.
 6. Update \`wiki/index.md\` and append \`wiki/log.md\` with the change.
-7. Use the \`llm-wiki-lint\` skill to health-check the wiki before handoff.
+7. If \`.llm-wiki-skills.json\` has \`integrations.qmd.enabled\`, run \`llm-wiki-skills qmd reindex\` once after all wiki writes.
+8. Use the \`llm-wiki-lint\` skill to health-check the wiki before handoff.
 `
       },
       {
@@ -59,11 +60,12 @@ Use this skill when answering questions against a local LLM wiki vault.
 ## Workflow
 
 1. Read \`wiki/index.md\` first and \`docs/llm-wiki-routing.md\` when present.
-2. Search \`wiki/\` with \`rg\` for relevant source and synthesis pages.
-3. Read the source pages behind any claim you plan to use.
-4. Answer with citations to wiki page paths.
-5. If the answer should become durable, save it under \`wiki/questions/\` or another appropriate wiki section.
-6. Update \`wiki/index.md\`, append \`wiki/log.md\`, and use the \`llm-wiki-lint\` skill when new pages or claims are added.
+2. If \`.llm-wiki-skills.json\` has \`integrations.qmd.enabled\`, use \`qmd search --json\` for keyword candidate discovery only.
+3. Search \`wiki/\` with \`rg\` for relevant source and synthesis pages; markdown remains the source of truth.
+4. Read the source pages behind any claim you plan to use.
+5. Answer with citations to wiki page paths.
+6. If the answer should become durable, save it under \`wiki/questions/\` or another appropriate wiki section.
+7. Update \`wiki/index.md\`, append \`wiki/log.md\`, and use the \`llm-wiki-lint\` skill when new pages or claims are added.
 `
       },
       {

@@ -12,10 +12,17 @@ export class LlmWikiError extends Error {
       | "InvalidTopicError"
       | "ConflictingTopicOptionError"
       | "ConflictingObsidianOptionError"
+      | "ConflictingQmdOptionError"
       | "HostRequiredError"
       | "HostSelectionCanceledError"
       | "RequiredFileMissingError"
-      | "ManifestMismatchError",
+      | "ManifestMismatchError"
+      | "QmdNotInstalledError"
+      | "QmdRuntimeUnsupportedError"
+      | "QmdDoctorFailedError"
+      | "QmdCollectionError"
+      | "QmdIndexUpdateError"
+      | "QmdCommandError",
     message: string,
     public readonly exitCode: number
   ) {
@@ -90,6 +97,12 @@ export class ConflictingObsidianOptionError extends LlmWikiError {
   }
 }
 
+export class ConflictingQmdOptionError extends LlmWikiError {
+  constructor(message = "Conflicting qmd options: use either --qmd or --no-qmd, not both.") {
+    super("ConflictingQmdOptionError", message, 17);
+  }
+}
+
 export class HostRequiredError extends LlmWikiError {
   constructor(message = "Select at least one host with --host when running outside a TTY.") {
     super("HostRequiredError", message, 10);
@@ -113,5 +126,41 @@ export class RequiredFileMissingError extends LlmWikiError {
 export class ManifestMismatchError extends LlmWikiError {
   constructor(message: string) {
     super("ManifestMismatchError", message, 13);
+  }
+}
+
+export class QmdNotInstalledError extends LlmWikiError {
+  constructor(message = "qmd is not installed. Install it with `npm install -g @tobilu/qmd` and then run `llm-wiki-skills qmd enable`.") {
+    super("QmdNotInstalledError", message, 18);
+  }
+}
+
+export class QmdRuntimeUnsupportedError extends LlmWikiError {
+  constructor(message = "qmd requires Node.js 22 or newer.") {
+    super("QmdRuntimeUnsupportedError", message, 19);
+  }
+}
+
+export class QmdDoctorFailedError extends LlmWikiError {
+  constructor(message: string) {
+    super("QmdDoctorFailedError", message, 20);
+  }
+}
+
+export class QmdCollectionError extends LlmWikiError {
+  constructor(message: string) {
+    super("QmdCollectionError", message, 21);
+  }
+}
+
+export class QmdIndexUpdateError extends LlmWikiError {
+  constructor(message: string) {
+    super("QmdIndexUpdateError", message, 22);
+  }
+}
+
+export class QmdCommandError extends LlmWikiError {
+  constructor(message: string) {
+    super("QmdCommandError", message, 23);
   }
 }

@@ -2,12 +2,13 @@
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { initCommand } from "./commands/init.js";
+import { qmdCommand } from "./commands/qmd.js";
 import { statusCommand } from "./commands/status.js";
-import { ConflictingObsidianOptionError, LlmWikiError } from "../core/errors.js";
+import { ConflictingObsidianOptionError, ConflictingQmdOptionError, LlmWikiError } from "../core/errors.js";
 import { parseHostValues } from "../core/hosts.js";
 import type { CommandOptions } from "../core/types.js";
 
-const COMMANDS = new Set(["init", "status"]);
+const COMMANDS = new Set(["init", "status", "qmd"]);
 
 async function main(argv: string[]): Promise<void> {
   const { command, options } = parseCommand(argv);
@@ -17,6 +18,9 @@ async function main(argv: string[]): Promise<void> {
       return;
     case "status":
       await statusCommand(options);
+      return;
+    case "qmd":
+      await qmdCommand(options);
       return;
     default:
       usage();
@@ -32,10 +36,18 @@ export function parseCommand(argv: string[]): { command: string; options: Comman
     process.exit(0);
   }
   if (!COMMANDS.has(command)) return { command, options: defaults() };
+  if (command === "qmd") return { command, options: parseQmdOptions(args) };
+  if (command === "status") return { command, options: parseStatusOptions(args) };
+  return { command, options: parseInitOptions(args) };
+}
+
+function parseInitOptions(args: string[]): CommandOptions {
   const options = defaults();
   const hostValues: string[] = [];
   let obsidianEnabled = false;
   let obsidianDisabled = false;
+  let qmdEnabled = false;
+  let qmdDisabled = false;
   while (args.length > 0) {
     const arg = args.shift();
     if (arg === "--root") {
@@ -70,13 +82,67 @@ export function parseCommand(argv: string[]): { command: string; options: Comman
     } else if (arg === "--no-obsidian") {
       obsidianDisabled = true;
       options.obsidian = false;
+    } else if (arg === "--qmd") {
+      qmdEnabled = true;
+      options.qmd = true;
+    } else if (arg === "--no-qmd") {
+      qmdDisabled = true;
+      options.qmd = false;
     } else {
       throw new Error(`Unknown option: ${arg}`);
     }
   }
   if (obsidianEnabled && obsidianDisabled) throw new ConflictingObsidianOptionError();
+  if (qmdEnabled && qmdDisabled) throw new ConflictingQmdOptionError();
   options.hosts = parseHostValues(hostValues);
-  return { command, options };
+  return options;
+}
+
+function parseStatusOptions(args: string[]): CommandOptions {
+  const options = defaults();
+  while (args.length > 0) {
+    const arg = args.shift();
+    if (arg === "--root") {
+      const value = args.shift();
+      if (!value) throw new Error("--root requires a path");
+      options.root = value;
+    } else if (arg === "--json") {
+      options.json = true;
+    } else if (arg === "--debug") {
+      options.debug = true;
+    } else if (arg === "--quiet") {
+      options.quiet = true;
+    } else {
+      throw new Error(`Unknown option: ${arg}`);
+    }
+  }
+  return options;
+}
+
+function parseQmdOptions(args: string[]): CommandOptions {
+  const options = defaults();
+  const action = args.shift();
+  if (action !== "enable" && action !== "disable" && action !== "status" && action !== "reindex") {
+    throw new Error("qmd requires one of: enable, disable, status, reindex");
+  }
+  options.qmdAction = action;
+  while (args.length > 0) {
+    const arg = args.shift();
+    if (arg === "--root") {
+      const value = args.shift();
+      if (!value) throw new Error("--root requires a path");
+      options.root = value;
+    } else if (arg === "--json") {
+      options.json = true;
+    } else if (arg === "--debug") {
+      options.debug = true;
+    } else if (arg === "--quiet") {
+      options.quiet = true;
+    } else {
+      throw new Error(`Unknown option: ${arg}`);
+    }
+  }
+  return options;
 }
 
 function defaults(): CommandOptions {
@@ -99,8 +165,9 @@ Codex or Claude Code to ingest sources, answer from the wiki, and
 health-check the wiki over time.
 
 Usage:
-  llm-wiki-skills init [--root DIR] [--host codex|claude-code] [--topic ID] [--obsidian|--no-obsidian] [--json] [--quiet]
+  llm-wiki-skills init [--root DIR] [--host codex|claude-code] [--topic ID] [--obsidian|--no-obsidian] [--qmd|--no-qmd] [--json] [--quiet]
   llm-wiki-skills status [--root DIR] [--json] [--quiet]
+  llm-wiki-skills qmd enable|disable|status|reindex [--root DIR] [--json] [--quiet]
 
 Hosts:
   codex        writes repo skills to .agents/skills

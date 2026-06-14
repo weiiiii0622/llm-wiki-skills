@@ -1,6 +1,6 @@
 import type { HealthReport, InitWriteStatus, StatusReport, ValidationIssue, WikiGraph, WikiPage } from "./types.js";
 
-export function renderInitReport(results: Record<string, InitWriteStatus>, obsidianHandoff?: string): string {
+export function renderInitReport(results: Record<string, InitWriteStatus>, obsidianHandoff?: string, qmdHandoff?: string): string {
   const entries = Object.entries(results).sort(([a], [b]) => a.localeCompare(b));
   const created = entries.filter(([, status]) => status === "created");
   const updated = entries.filter(([, status]) => status === "updated");
@@ -22,6 +22,9 @@ export function renderInitReport(results: Record<string, InitWriteStatus>, obsid
     obsidianHandoff ? "" : undefined,
     obsidianHandoff ? "◇ Obsidian" : undefined,
     obsidianHandoff ? `  ${formatObsidianHandoff(obsidianHandoff)}` : undefined,
+    qmdHandoff ? "" : undefined,
+    qmdHandoff ? "◇ qmd" : undefined,
+    qmdHandoff ? `  ${qmdHandoff}` : undefined,
     "",
     "→ Next",
     "  npx llm-wiki-skills status"
@@ -39,6 +42,7 @@ export function renderStatusReport(report: StatusReport): string {
     `Hosts: ${report.hosts.join(", ")}`,
     `Topic: ${report.topic?.id ?? "unknown"}`,
     `Obsidian: ${report.integrations?.obsidian?.enabled ? "enabled" : "not configured"}`,
+    `qmd: ${report.integrations?.qmd?.enabled ? `enabled (${report.integrations.qmd.collection})` : "not configured"}`,
     `Checked files: ${report.checkedFiles.length}`,
     ""
   ].join("\n");
@@ -118,6 +122,7 @@ function setupSummary(entries: Array<[string, InitWriteStatus]>): string[] {
   if (paths.some((file) => file.startsWith("wiki/") || file === "docs/llm-wiki-routing.md")) lines.push("Wiki pages and topic folders");
   if (paths.some((file) => file === "docs/llm-wiki-contract.md" || file === "docs/llm-wiki-workflows.md")) lines.push("Reference docs");
   if (paths.some((file) => file.startsWith(".obsidian/"))) lines.push("Obsidian vault settings");
+  if (paths.some((file) => file === "docs/llm-wiki-qmd.md")) lines.push("qmd search docs");
   if (paths.includes(".gitignore")) lines.push(".gitignore runtime rules");
   if (paths.includes(".llm-wiki-skills.json")) lines.push("Install manifest");
   return lines;

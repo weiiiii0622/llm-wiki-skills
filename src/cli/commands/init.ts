@@ -3,13 +3,18 @@ import { renderInitReport } from "../../core/reports.js";
 import { ConflictingTopicOptionError, HostRequiredError, InvalidTopicError } from "../../core/errors.js";
 import { printResult } from "../format.js";
 import { buildInitPlan, executeInitPlan, type InitPlan } from "../init-plan.js";
+import { enableQmdWithInstallPrompt } from "../qmd-install.js";
 import { getTopicTemplate, isTopicSelectionId, type ResolvedTopicSelection, type TopicSelectionId } from "../../core/topic-templates.js";
 
 export async function initCommand(options: CommandOptions): Promise<void> {
   const plan = await resolveInitPlan(options);
   const results = await executeInitPlan(plan);
+  const qmdResult = plan.qmdEnabled
+    ? await enableQmdWithInstallPrompt(plan.root, { installApproved: plan.qmdInstallApproved, optional: true, prompt: !options.json && !options.quiet, now: fixedNow() })
+    : undefined;
   const customHandoffPrompt = buildCustomTopicHandoffPrompt(plan.topic);
   const obsidianHandoff = buildObsidianHandoff(plan.obsidianEnabled);
+  const qmdHandoff = qmdResult?.message;
 
   printResult(
     {
@@ -17,25 +22,28 @@ export async function initCommand(options: CommandOptions): Promise<void> {
       hosts: plan.hosts,
       topic: plan.topic,
       obsidian: plan.obsidianEnabled,
+      qmd: qmdResult?.status === "enabled",
+      ...(qmdResult ? { qmdStatus: qmdResult } : {}),
       files: results,
       ...(obsidianHandoff ? { obsidianHandoff } : {}),
+      ...(qmdHandoff ? { qmdHandoff } : {}),
       ...(customHandoffPrompt ? { customHandoffPrompt } : {})
     },
     options.json,
     options.quiet,
-    `${renderInitReport(results, obsidianHandoff)}${customHandoffPrompt ? `\n${customHandoffPrompt}\n` : ""}`
+    `${renderInitReport(results, obsidianHandoff, qmdHandoff)}${customHandoffPrompt ? `\n${customHandoffPrompt}\n` : ""}`
   );
 }
 
 async function resolveInitPlan(options: CommandOptions): Promise<InitPlan> {
   const topic = resolveTopicSelection(options);
-  if (options.hosts.length > 0) return buildInitPlan(options.root, options.hosts, topic, options.obsidian ?? true);
+  if (options.hosts.length > 0) return buildInitPlan(options.root, options.hosts, topic, options.obsidian ?? true, options.qmd ?? false);
   if (options.json || options.quiet) throw new HostRequiredError();
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
     if (!process.env.LLM_WIKI_SKILLS_TEST_PROMPTS) throw new HostRequiredError();
   }
   const { runInitWizard } = await import("../init-wizard.js");
-  return runInitWizard(options.root, undefined, topicWasProvided(options) ? topic : undefined, options.obsidian);
+  return runInitWizard(options.root, undefined, topicWasProvided(options) ? topic : undefined, options.obsidian, options.qmd);
 }
 
 export function resolveTopicSelection(options: Pick<CommandOptions, "topicValues" | "templateValues" | "customTopic">): ResolvedTopicSelection {
@@ -101,4 +109,8 @@ function buildCustomTopicHandoffPrompt(topic: ResolvedTopicSelection): string | 
 function buildObsidianHandoff(enabled: boolean): string | undefined {
   if (!enabled) return undefined;
   return "Open this folder as a vault. Native graph is configured for `path:wiki/`; personal workspace files are ignored in `.gitignore`.";
+}
+
+function fixedNow(): Date | undefined {
+  return process.env.LLM_WIKI_SKILLS_NOW ? new Date(process.env.LLM_WIKI_SKILLS_NOW) : undefined;
 }

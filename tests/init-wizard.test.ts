@@ -251,6 +251,37 @@ describe("init wizard", () => {
     expect(write.mock.calls.join("\n")).toContain("Obsidian disabled");
   });
 
+  it("asks qmd install permission immediately after qmd setup is accepted", async () => {
+    const confirmMessages: string[] = [];
+    const runtime = {
+      decorated: false,
+      enterScrollableScreen: vi.fn(),
+      enterAlternateScreen: vi.fn(),
+      exitAlternateScreen: vi.fn(),
+      write: vi.fn(),
+      selectHosts: vi.fn(async () => ["codex" as const]),
+      selectTopic: vi.fn(async () => "general" as const),
+      text: vi.fn(async () => ""),
+      confirm: vi.fn(async (message: string) => {
+        confirmMessages.push(message);
+        if (message === "Set up qmd keyword search acceleration?") return true;
+        if (message === "Allow to install qmd by `npm install -g @tobilu/qmd`?") return false;
+        return true;
+      })
+    } as Parameters<typeof runInitWizard>[1];
+
+    const plan = await runInitWizard("/tmp/wiki", runtime);
+
+    expect(confirmMessages).toEqual([
+      "Set up Obsidian vault metadata and graph view?",
+      "Set up qmd keyword search acceleration?",
+      "Allow to install qmd by `npm install -g @tobilu/qmd`?",
+      "Create these LLM Wiki skill files?"
+    ]);
+    expect(plan.qmdEnabled).toBe(true);
+    expect(plan.qmdInstallApproved).toBe(false);
+  });
+
   it("uses a fixed topic when command-line topic options were already provided", async () => {
     const { runtime, write } = scriptedRuntime({ hosts: ["codex"], topic: "finance", confirm: true });
 

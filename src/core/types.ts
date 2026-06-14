@@ -9,6 +9,8 @@ export interface CommandOptions {
   debug: boolean;
   quiet: boolean;
   obsidian?: boolean;
+  qmd?: boolean;
+  qmdAction?: "enable" | "disable" | "status" | "reindex";
   hosts: HostId[];
   topicValues: string[];
   templateValues: string[];
@@ -50,6 +52,15 @@ export interface ManifestIntegrations {
     enabled: true;
     schemaVersion: 1;
     generatedFiles: string[];
+  };
+  qmd?: {
+    enabled: true;
+    schemaVersion: 1;
+    collection: string;
+    root: string;
+    docsPath: string;
+    searchMode: "keyword";
+    lastIndexedAt?: string;
   };
 }
 

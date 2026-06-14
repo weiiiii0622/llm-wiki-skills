@@ -24,13 +24,22 @@ export interface InitPlan {
   hosts: HostId[];
   topic: ResolvedTopicSelection;
   obsidianEnabled: boolean;
+  qmdEnabled: boolean;
+  qmdInstallApproved?: boolean;
   directories: string[];
   topicDirectories: string[];
   managedFiles: string[];
   files: PlannedInitFile[];
 }
 
-export function buildInitPlan(root: string, hosts: HostId[], topic: ResolvedTopicSelection = defaultTopicSelection(), obsidianEnabled = true): InitPlan {
+export function buildInitPlan(
+  root: string,
+  hosts: HostId[],
+  topic: ResolvedTopicSelection = defaultTopicSelection(),
+  obsidianEnabled = true,
+  qmdEnabled = false,
+  qmdInstallApproved?: boolean
+): InitPlan {
   const integrations = obsidianEnabled ? { obsidian: obsidianIntegrationMetadata() } : undefined;
   const files: PlannedInitFile[] = [
     ...starterFileEntries().map((entry) => ({ ...entry, group: "starter" as const })),
@@ -51,6 +60,8 @@ export function buildInitPlan(root: string, hosts: HostId[], topic: ResolvedTopi
     hosts: [...hosts],
     topic,
     obsidianEnabled,
+    qmdEnabled,
+    qmdInstallApproved,
     directories: [...REQUIRED_DIRECTORIES],
     topicDirectories: uniqueSorted(topicTemplateDirectories(topic)),
     managedFiles: obsidianEnabled ? [".gitignore"] : [],

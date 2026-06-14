@@ -16,7 +16,7 @@ It is useful when you want to:
 - give Codex and Claude Code the same wiki workflow;
 - keep everything local, file-based, and easy to inspect.
 
-The CLI does not call an LLM, run a hosted service, or create a vector database. It installs the local folder structure and agent skills. Your AI assistant uses those skills when you ask it to ingest sources, answer from the wiki, or review wiki changes.
+The CLI does not call an LLM or run a hosted service. It installs the local folder structure and agent skills. Optional qmd support can add a local SQLite-backed keyword search accelerator, while markdown remains the source of truth.
 
 ## Quickstart
 
@@ -39,6 +39,14 @@ npx llm-wiki-skills init --host codex
 ```
 
 Use `--no-obsidian` if you only want the agent skills and markdown wiki files.
+
+qmd search acceleration is optional and off by default:
+
+```sh
+npx llm-wiki-skills init --host codex --qmd
+```
+
+If qmd is not installed, interactive setup asks before running `npm install -g @tobilu/qmd`.
 
 ## How You Use It
 
@@ -72,6 +80,7 @@ wiki/                        durable markdown knowledge
 docs/llm-wiki-contract.md    local wiki rules
 docs/llm-wiki-workflows.md   ingest/query/lint workflow reference
 .obsidian/                   stable Obsidian vault settings
+docs/llm-wiki-qmd.md         qmd usage notes, only when qmd is enabled
 .llm-wiki-skills.json        install manifest for status checks
 ```
 
@@ -91,6 +100,24 @@ Flags:
 npx llm-wiki-skills init --obsidian
 npx llm-wiki-skills init --no-obsidian
 ```
+
+## qmd Search Support
+
+qmd support is optional. When enabled, generated query skills still read `wiki/index.md` first and treat markdown under `wiki/` as canonical. qmd is used only for keyword candidate discovery with `qmd search --json`.
+
+qmd requires Node.js 22 or newer and an external `qmd` executable from `@tobilu/qmd`. The CLI does not bundle qmd.
+
+Commands:
+
+```sh
+npx llm-wiki-skills init --host codex --qmd
+npx llm-wiki-skills qmd enable
+npx llm-wiki-skills qmd status
+npx llm-wiki-skills qmd reindex
+npx llm-wiki-skills qmd disable
+```
+
+`qmd disable` is non-destructive: it removes llm-wiki-skills qmd metadata and generated qmd docs, but leaves external qmd indexes and collections untouched.
 
 ## Topic Directory Scaffolds
 
@@ -325,8 +352,9 @@ npx llm-wiki-skills init --host codex --topic custom --custom-topic "board game 
 ## Commands
 
 ```sh
-llm-wiki-skills init [--root DIR] [--host codex|claude-code] [--topic ID] [--json] [--quiet]
+llm-wiki-skills init [--root DIR] [--host codex|claude-code] [--topic ID] [--obsidian|--no-obsidian] [--qmd|--no-qmd] [--json] [--quiet]
 llm-wiki-skills status [--root DIR] [--json] [--quiet]
+llm-wiki-skills qmd enable|disable|status|reindex [--root DIR] [--json] [--quiet]
 ```
 
 `init` installs the local wiki contract, starter pages, optional topic scaffold, shared references, selected host skills, and a manifest.
@@ -339,7 +367,7 @@ If `--host` is omitted in an interactive terminal, `init` opens a guided setup: 
 
 ## Requirements
 
-- Node.js 20 or newer.
+- Node.js 22 or newer.
 - Codex or Claude Code if you want an agent to use the generated skills.
 - A project directory or markdown vault where local files can be created.
 

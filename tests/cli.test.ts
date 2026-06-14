@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { INIT_CANCELED_MESSAGE } from "../src/core/errors.js";
@@ -46,6 +46,15 @@ describe("cli", () => {
 
     expect(result.exitCode).toBe(16);
     expect(result.stderr).toContain("Conflicting Obsidian options");
+    expectProjectErrorCodeHidden(result.stderr);
+  });
+
+  it("conflicting qmd flags fail", async () => {
+    const root = await tempRoot("llm-wiki-qmd-conflict-");
+    const result = await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--qmd", "--no-qmd"], fixedEnv(), false);
+
+    expect(result.exitCode).toBe(17);
+    expect(result.stderr).toContain("Conflicting qmd options");
     expectProjectErrorCodeHidden(result.stderr);
   });
 
@@ -272,6 +281,143 @@ describe("cli", () => {
     expect(quiet.stderr).toBe("");
   });
 
+  it("init --qmd enables qmd only after fake qmd setup succeeds", async () => {
+    const root = await tempRoot("llm-wiki-qmd-init-");
+    const fake = await fakeQmdEnv();
+    const result = await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--qmd", "--json"], fixedEnv(undefined, fake.env));
+
+    const output = JSON.parse(result.stdout);
+    expect(output.qmd).toBe(true);
+    expect(output.qmdStatus.status).toBe("enabled");
+    expect(output.qmdStatus.message).toContain("keyword candidate discovery");
+    const manifest = JSON.parse(await readFile(path.join(root, ".llm-wiki-skills.json"), "utf8"));
+    expect(manifest.integrations.qmd).toMatchObject({
+      enabled: true,
+      schemaVersion: 1,
+      docsPath: "docs/llm-wiki-qmd.md",
+      searchMode: "keyword",
+      lastIndexedAt: "2026-06-10T00:00:00.000Z"
+    });
+    expect(manifest.integrations.qmd.collection).toMatch(/^llm-wiki-[a-f0-9]{12}$/);
+    expect(manifest.files).toContain("docs/llm-wiki-qmd.md");
+    await expect(readFile(path.join(root, "docs/llm-wiki-qmd.md"), "utf8")).resolves.toContain("qmd search --json");
+    expect(await readFile(fake.log, "utf8")).toContain("collection add");
+  });
+
+  it("init --qmd prompts to install qmd when missing and user accepts", async () => {
+    const root = await tempRoot("llm-wiki-qmd-install-");
+    const fake = await fakeInstallableQmdEnv();
+    const result = await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--qmd"], fixedEnv({ qmdInstall: true }, fake.env));
+
+    expect(result.stdout).toContain("Running `npm install -g @tobilu/qmd`...");
+    expect(result.stdout).toContain("installing qmd fake log");
+    expect(result.stdout).toContain("◇ qmd");
+    expect(result.stdout).toContain("qmd enabled");
+    expect(await readFile(fake.log, "utf8")).toContain("npm install -g @tobilu/qmd");
+    const manifest = JSON.parse(await readFile(path.join(root, ".llm-wiki-skills.json"), "utf8"));
+    expect(manifest.integrations.qmd).toMatchObject({ enabled: true, searchMode: "keyword" });
+  });
+
+  it("interactive init installs qmd before preview and create confirmation", async () => {
+    const root = await tempRoot("llm-wiki-qmd-wizard-install-");
+    const fake = await fakeInstallableQmdEnv();
+    const result = await execaNode(
+      ["dist/cli/index.js", "init", "--root", root],
+      fixedEnv({ hosts: ["codex"], qmd: true, qmdInstall: true, confirm: true }, fake.env)
+    );
+
+    const installStart = result.stdout.indexOf("Running `npm install -g @tobilu/qmd`...");
+    const installLog = result.stdout.indexOf("installing qmd fake log");
+    const preview = result.stdout.indexOf("LLM Wiki init preview");
+    const report = result.stdout.indexOf("◇ qmd");
+    expect(installStart).toBeGreaterThanOrEqual(0);
+    expect(installLog).toBeGreaterThan(installStart);
+    expect(preview).toBeGreaterThan(installLog);
+    expect(report).toBeGreaterThan(preview);
+    expect(result.stdout).toContain("qmd enabled");
+    expect(await readFile(fake.log, "utf8")).toContain("npm install -g @tobilu/qmd");
+    const manifest = JSON.parse(await readFile(path.join(root, ".llm-wiki-skills.json"), "utf8"));
+    expect(manifest.integrations.qmd).toMatchObject({ enabled: true, searchMode: "keyword" });
+  });
+
+  it("init --qmd reports qmd enable follow-up when user declines installation", async () => {
+    const root = await tempRoot("llm-wiki-qmd-declined-");
+    const emptyBin = await tempRoot("llm-wiki-empty-bin-");
+    const result = await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--qmd"], fixedEnv({ qmdInstall: false }, { PATH: emptyBin }));
+
+    expect(result.stdout).toContain("◇ qmd");
+    expect(result.stdout).toContain("npx llm-wiki-skills qmd enable");
+    expect(result.stderr).toBe("");
+    await expect(readFile(path.join(root, "wiki/index.md"), "utf8")).resolves.toContain("# Wiki Index");
+    const manifest = JSON.parse(await readFile(path.join(root, ".llm-wiki-skills.json"), "utf8"));
+    expect(manifest.integrations.qmd).toBeUndefined();
+    expect(manifest.files).not.toContain("docs/llm-wiki-qmd.md");
+  });
+
+  it("qmd enable, reindex, status, and disable use fake qmd lifecycle", async () => {
+    const root = await tempRoot("llm-wiki-qmd-command-");
+    const fake = await fakeQmdEnv();
+    await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--no-qmd", "--quiet"], fixedEnv());
+
+    const enabled = await execaNode(["dist/cli/index.js", "qmd", "enable", "--root", root, "--json"], fixedEnv(undefined, fake.env));
+    expect(JSON.parse(enabled.stdout)).toMatchObject({ status: "enabled", docsPath: "docs/llm-wiki-qmd.md" });
+
+    const reindexed = await execaNode(["dist/cli/index.js", "qmd", "reindex", "--root", root, "--json"], fixedEnv(undefined, fake.env));
+    expect(JSON.parse(reindexed.stdout)).toMatchObject({ status: "reindexed" });
+
+    const status = await execaNode(["dist/cli/index.js", "qmd", "status", "--root", root, "--json"], fixedEnv(undefined, fake.env));
+    expect(JSON.parse(status.stdout)).toMatchObject({ status: "enabled" });
+
+    const disabled = await execaNode(["dist/cli/index.js", "qmd", "disable", "--root", root, "--json"], fixedEnv(undefined, fake.env));
+    expect(JSON.parse(disabled.stdout).message).toContain("left untouched");
+    await expect(readFile(path.join(root, "docs/llm-wiki-qmd.md"), "utf8")).rejects.toThrow();
+    const manifest = JSON.parse(await readFile(path.join(root, ".llm-wiki-skills.json"), "utf8"));
+    expect(manifest.integrations.qmd).toBeUndefined();
+  });
+
+  it("qmd enable prompts to install qmd when missing", async () => {
+    const root = await tempRoot("llm-wiki-qmd-enable-install-");
+    const fake = await fakeInstallableQmdEnv();
+    await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--no-qmd", "--quiet"], fixedEnv());
+
+    const enabled = await execaNode(["dist/cli/index.js", "qmd", "enable", "--root", root], fixedEnv({ qmdInstall: true }, fake.env));
+
+    expect(enabled.stdout).toContain("Running `npm install -g @tobilu/qmd`...");
+    expect(enabled.stdout).toContain("installing qmd fake log");
+    expect(enabled.stdout).toContain("qmd: enabled");
+    expect(await readFile(fake.log, "utf8")).toContain("npm install -g @tobilu/qmd");
+    const manifest = JSON.parse(await readFile(path.join(root, ".llm-wiki-skills.json"), "utf8"));
+    expect(manifest.integrations.qmd).toMatchObject({ enabled: true });
+  });
+
+  it("qmd enable reports follow-up when user declines qmd installation", async () => {
+    const root = await tempRoot("llm-wiki-qmd-enable-declined-");
+    const emptyBin = await tempRoot("llm-wiki-empty-qmd-enable-bin-");
+    await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--no-qmd", "--quiet"], fixedEnv());
+
+    const declined = await execaNode(["dist/cli/index.js", "qmd", "enable", "--root", root], fixedEnv({ qmdInstall: false }, { PATH: emptyBin }));
+
+    expect(declined.stdout).toContain("qmd: disabled");
+    expect(declined.stdout).toContain("npx llm-wiki-skills qmd enable");
+    expect(declined.stderr).toBe("");
+    const manifest = JSON.parse(await readFile(path.join(root, ".llm-wiki-skills.json"), "utf8"));
+    expect(manifest.integrations.qmd).toBeUndefined();
+  });
+
+  it("qmd enable can re-enable after disable when the qmd collection already exists", async () => {
+    const root = await tempRoot("llm-wiki-qmd-reenable-");
+    const fake = await fakeQmdEnv();
+    await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--no-qmd", "--quiet"], fixedEnv());
+
+    await execaNode(["dist/cli/index.js", "qmd", "enable", "--root", root, "--quiet"], fixedEnv(undefined, fake.env));
+    await execaNode(["dist/cli/index.js", "qmd", "disable", "--root", root, "--quiet"], fixedEnv(undefined, fake.env));
+    const reenabled = await execaNode(["dist/cli/index.js", "qmd", "enable", "--root", root, "--json"], fixedEnv(undefined, fake.env));
+
+    expect(JSON.parse(reenabled.stdout)).toMatchObject({ status: "enabled" });
+    const manifest = JSON.parse(await readFile(path.join(root, ".llm-wiki-skills.json"), "utf8"));
+    expect(manifest.integrations.qmd).toMatchObject({ enabled: true });
+  });
+
   it("unknown host returns InvalidHostError", async () => {
     const root = await tempRoot("llm-wiki-invalid-host-");
     const result = await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "unknown"], fixedEnv(), false);
@@ -409,6 +555,22 @@ describe("cli", () => {
     expectProjectErrorCodeHidden(result.stderr);
   });
 
+  it("status validates qmd-only metadata and rejects unknown integrations", async () => {
+    const root = await tempRoot("llm-wiki-qmd-validation-");
+    const fake = await fakeQmdEnv();
+    await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--no-obsidian", "--qmd", "--quiet"], fixedEnv(undefined, fake.env));
+    const status = await execaNode(["dist/cli/index.js", "status", "--root", root, "--json"], fixedEnv());
+    expect(JSON.parse(status.stdout)).toMatchObject({ integrations: { qmd: { enabled: true } } });
+
+    const manifestPath = path.join(root, ".llm-wiki-skills.json");
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+    manifest.integrations.unknown = { enabled: true };
+    await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+    const invalid = await execaNode(["dist/cli/index.js", "status", "--root", root], fixedEnv(), false);
+    expect(invalid.exitCode).toBe(13);
+    expect(invalid.stderr).toContain("unsupported integration keys: unknown");
+  });
+
   it("rerun init does not overwrite existing user-edited files", async () => {
     const root = await tempRoot("llm-wiki-existing-");
     await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--quiet"], fixedEnv());
@@ -438,11 +600,69 @@ describe("cli", () => {
   });
 });
 
-function fixedEnv(promptAnswers?: Record<string, unknown>): Record<string, string> {
+function fixedEnv(promptAnswers?: Record<string, unknown>, extraEnv: Record<string, string> = {}): Record<string, string> {
   return {
     LLM_WIKI_SKILLS_NOW: "2026-06-10T00:00:00.000Z",
+    ...extraEnv,
     ...(promptAnswers ? { LLM_WIKI_SKILLS_TEST_PROMPTS: JSON.stringify(promptAnswers) } : {})
   };
+}
+
+async function fakeQmdEnv(): Promise<{ env: Record<string, string>; log: string }> {
+  const bin = await tempRoot("llm-wiki-fake-qmd-bin-");
+  const log = path.join(bin, "qmd.log");
+  const state = path.join(bin, "collections.txt");
+  await mkdir(bin, { recursive: true });
+  await writeExecutable(
+    path.join(bin, "qmd"),
+    `#!/bin/sh
+printf "qmd %s\\n" "$*" >> "$QMD_LOG"
+if [ "$QMD_FAIL" = "$1" ]; then
+  echo "forced qmd failure" >&2
+  exit 2
+fi
+if [ "$1 $2" = "collection add" ]; then
+  collection="$3"
+  if grep -qx "$collection" "$QMD_COLLECTION_STATE" 2>/dev/null; then
+    echo "Collection '$collection' already exists." >&2
+    echo "Use a different name with --name <name>" >&2
+    exit 2
+  fi
+  echo "$collection" >> "$QMD_COLLECTION_STATE"
+fi
+exit 0
+`
+  );
+  await writeExecutable(
+    path.join(bin, "npm"),
+    `#!/bin/sh
+printf "npm %s\\n" "$*" >> "$QMD_LOG"
+exit 0
+`
+  );
+  return { env: { PATH: `${bin}${path.delimiter}${process.env.PATH ?? ""}`, QMD_LOG: log, QMD_COLLECTION_STATE: state }, log };
+}
+
+async function fakeInstallableQmdEnv(): Promise<{ env: Record<string, string>; log: string }> {
+  const bin = await tempRoot("llm-wiki-installable-qmd-bin-");
+  const log = path.join(bin, "qmd.log");
+  await mkdir(bin, { recursive: true });
+  await writeExecutable(
+    path.join(bin, "npm"),
+    `#!/bin/sh
+printf "npm %s\\n" "$*" >> "$QMD_LOG"
+echo "installing qmd fake log"
+printf '%s\\n' '#!/bin/sh' 'printf "qmd %s\\\\n" "$*" >> "$QMD_LOG"' 'exit 0' > "$QMD_INSTALL_BIN/qmd"
+/bin/chmod +x "$QMD_INSTALL_BIN/qmd"
+exit 0
+`
+  );
+  return { env: { PATH: bin, QMD_LOG: log, QMD_INSTALL_BIN: bin }, log };
+}
+
+async function writeExecutable(target: string, content: string): Promise<void> {
+  await writeFile(target, content, "utf8");
+  await chmod(target, 0o755);
 }
 
 async function tempRoot(prefix: string): Promise<string> {
@@ -451,6 +671,6 @@ async function tempRoot(prefix: string): Promise<string> {
 
 function expectProjectErrorCodeHidden(stderr: string): void {
   expect(stderr).not.toMatch(
-    /(VaultNotFoundError|InvalidFrontmatterError|BrokenLinkError|GraphDriftError|ImmutableRawViolationError|WriteConflictError|PackageAssetMissingError|InvalidHostError|InvalidTopicError|ConflictingTopicOptionError|ConflictingObsidianOptionError|HostRequiredError|HostSelectionCanceledError|RequiredFileMissingError|ManifestMismatchError):/
+    /(VaultNotFoundError|InvalidFrontmatterError|BrokenLinkError|GraphDriftError|ImmutableRawViolationError|WriteConflictError|PackageAssetMissingError|InvalidHostError|InvalidTopicError|ConflictingTopicOptionError|ConflictingObsidianOptionError|ConflictingQmdOptionError|HostRequiredError|HostSelectionCanceledError|RequiredFileMissingError|ManifestMismatchError|QmdNotInstalledError|QmdRuntimeUnsupportedError|QmdDoctorFailedError|QmdCollectionError|QmdIndexUpdateError|QmdCommandError):/
   );
 }

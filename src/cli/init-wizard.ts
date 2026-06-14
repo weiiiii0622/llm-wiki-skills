@@ -1,14 +1,17 @@
 import { HostSelectionCanceledError } from "../core/errors.js";
 import { getHostAdapter } from "../core/hosts.js";
+import { installQmdPackage } from "../core/qmd.js";
 import { getTopicTemplate, TOPIC_TEMPLATE_IDS, type ResolvedTopicSelection, type TopicSelectionId } from "../core/topic-templates.js";
 import type { HostId } from "../core/types.js";
 import { buildInitPlan, groupInitPlanFiles, type InitFileGroupId, type InitPlan } from "./init-plan.js";
 import { createPromptRuntime, hostPromptChoices, type PromptRuntime, type TopicPromptChoice } from "./prompt-runtime.js";
+import { QMD_INSTALL_PROMPT } from "./qmd-install.js";
 
 export interface InitPreviewModel {
   root: string;
   hosts: string[];
   obsidian: boolean;
+  qmd: boolean;
   topic: {
     id: TopicSelectionId;
     label: string;
@@ -32,13 +35,23 @@ export async function runInitWizard(
   root: string,
   runtime: PromptRuntime = createPromptRuntime(),
   fixedTopic?: ResolvedTopicSelection,
-  fixedObsidianEnabled?: boolean
+  fixedObsidianEnabled?: boolean,
+  fixedQmdEnabled?: boolean
 ): Promise<InitPlan> {
   runtime.enterScrollableScreen();
   const hosts = await runtime.selectHosts(hostPromptChoices());
   const topic = fixedTopic ?? (await selectTopic(runtime));
   const obsidianEnabled = fixedObsidianEnabled ?? (await runtime.confirm("Set up Obsidian vault metadata and graph view?", true));
-  const plan = buildInitPlan(root, hosts, topic, obsidianEnabled);
+  const qmdEnabled = fixedQmdEnabled ?? (await runtime.confirm("Set up qmd keyword search acceleration?", false));
+  let qmdInstallApproved: boolean | undefined = false;
+  if (qmdEnabled) {
+    qmdInstallApproved = await runtime.confirm(QMD_INSTALL_PROMPT, false);
+    if (qmdInstallApproved) {
+      await installQmdPackage();
+      qmdInstallApproved = undefined;
+    }
+  }
+  const plan = buildInitPlan(root, hosts, topic, obsidianEnabled, qmdEnabled, qmdInstallApproved);
   runtime.write(renderInitPreview(buildInitPreviewModel(plan), { decorated: runtime.decorated }));
   const confirmed = await runtime.confirm("Create these LLM Wiki skill files?", true);
   if (!confirmed) throw new HostSelectionCanceledError();
@@ -51,6 +64,7 @@ export function buildInitPreviewModel(plan: InitPlan): InitPreviewModel {
     root: plan.root,
     hosts: plan.hosts.map(hostLabel),
     obsidian: plan.obsidianEnabled,
+    qmd: plan.qmdEnabled,
     topic: {
       id: plan.topic.id,
       label: plan.topic.label,
@@ -86,6 +100,7 @@ export function renderInitPreview(model: InitPreviewModel, options: RenderInitPr
     `${ui.dim("Hosts")} ${model.hosts.join(", ")}`,
     `${ui.dim("Topic")} ${model.topic.label}${model.topic.customTopic ? `: ${model.topic.customTopic}` : ""}`,
     `${ui.dim("Obsidian")} ${model.obsidian ? "enabled" : "disabled"}`,
+    `${ui.dim("qmd")} ${model.qmd ? "enabled after setup" : "disabled"}`,
     `${ui.dim("Examples")} ${model.topic.examples.join(", ")}`,
     "",
     ui.bold("Files to create or update:")
