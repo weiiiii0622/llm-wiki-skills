@@ -16,7 +16,7 @@ It is useful when you want to:
 - give Codex and Claude Code the same wiki workflow;
 - keep everything local, file-based, and easy to inspect.
 
-The CLI does not call an LLM or run a hosted service. It installs the local folder structure and agent skills. Optional qmd support can add a local SQLite-backed keyword search accelerator, while markdown remains the source of truth.
+The CLI does not call a hosted service. It installs the local folder structure and agent skills. Optional qmd support can add local SQLite-backed hybrid search, including on-device semantic search and reranking, while markdown remains the source of truth.
 
 ## Quickstart
 
@@ -40,7 +40,7 @@ npx llm-wiki-skills init --host codex
 
 Use `--no-obsidian` if you only want the agent skills and markdown wiki files.
 
-qmd search acceleration is optional and off by default:
+qmd hybrid search acceleration is optional and off by default:
 
 ```sh
 npx llm-wiki-skills init --host codex --qmd
@@ -103,9 +103,15 @@ npx llm-wiki-skills init --no-obsidian
 
 ## qmd Search Support
 
-qmd support is optional. When enabled, generated query skills still read `wiki/index.md` first and treat markdown under `wiki/` as canonical. qmd is used only for keyword candidate discovery with `qmd search --json`.
+qmd support is optional. When enabled, generated query skills still read `wiki/index.md` first and treat markdown under `wiki/` as canonical. qmd is used for local candidate discovery:
+
+- `qmd query --json` when hybrid semantic search is ready
+- `QMD_FORCE_CPU=1 qmd query --json` when setup fell back to CPU mode
+- `qmd search --json` when semantic setup fell back to full-text search
 
 qmd requires Node.js 22 or newer and an external `qmd` executable from `@tobilu/qmd`. The CLI does not bundle qmd.
+
+Semantic setup runs `qmd embed` and may download local GGUF models on first use. Current qmd defaults are about 2GB total: `embeddinggemma-300M-Q8_0` (~300MB), `qwen3-reranker-0.6b-q8_0` (~640MB), and `qmd-query-expansion-1.7B-q4_k_m` (~1.1GB), cached under `~/.cache/qmd/models/`. If GPU setup fails in an interactive terminal, the CLI asks whether to continue in CPU mode or fall back to full-text search. In non-interactive mode, it automatically retries in CPU mode.
 
 Commands:
 

@@ -2,7 +2,7 @@ import { chmod, mkdir, mkdtemp, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ExecFileQmdRunner, installQmdPackage, type QmdRunner } from "../src/core/qmd.js";
+import { ExecFileQmdRunner, classifyQmdSemanticFailure, installQmdPackage, type QmdRunner } from "../src/core/qmd.js";
 
 describe("qmd runner", () => {
   afterEach(() => {
@@ -95,6 +95,39 @@ fs.mkdirSync(path.join(pwd, ".qmd"), { recursive: true });
     await new ExecFileQmdRunner().run(command, ["init"], root);
 
     expect((await stat(path.join(root, ".qmd"))).isDirectory()).toBe(true);
+  });
+
+  it("passes per-command env overrides without mutating global env", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "llm-wiki-qmd-env-"));
+    const command = path.join(root, "fake-qmd");
+    await writeFile(
+      command,
+      `#!/bin/sh
+printf "%s" "$QMD_FORCE_CPU"
+`,
+      "utf8"
+    );
+    await chmod(command, 0o755);
+
+    const before = process.env.QMD_FORCE_CPU;
+    delete process.env.QMD_FORCE_CPU;
+    try {
+      const result = await new ExecFileQmdRunner().run(command, ["embed"], root, { env: { QMD_FORCE_CPU: "1" } });
+
+      expect(result.stdout).toBe("1");
+      expect(process.env.QMD_FORCE_CPU).toBeUndefined();
+    } finally {
+      if (before === undefined) delete process.env.QMD_FORCE_CPU;
+      else process.env.QMD_FORCE_CPU = before;
+    }
+  });
+
+  it("classifies semantic qmd failures for fallback decisions", () => {
+    expect(classifyQmdSemanticFailure("ggml-cuda.cu:98 CUDA backend failed")).toBe("gpu");
+    expect(classifyQmdSemanticFailure("failed to download model from HuggingFace: ENOTFOUND")).toBe("model-download");
+    expect(classifyQmdSemanticFailure("spawn qmd ENOENT")).toBe("qmd-missing");
+    expect(classifyQmdSemanticFailure("qmd requires Node.js >= 22")).toBe("node-unsupported");
+    expect(classifyQmdSemanticFailure("sqlite database is locked")).toBe("generic");
   });
 });
 

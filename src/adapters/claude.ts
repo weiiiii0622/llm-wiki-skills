@@ -1,4 +1,5 @@
 import type { HostAdapter } from "../core/types.js";
+import { QMD_QUERY_WORKFLOW_STEP } from "./qmd-instructions.js";
 
 export function claudeCodeAdapter(): HostAdapter {
   return {
@@ -61,7 +62,7 @@ Use this skill when answering questions against a local LLM wiki vault.
 ## Workflow
 
 1. Read \`wiki/index.md\` and \`docs/llm-wiki-routing.md\` when present.
-2. If \`.llm-wiki-skills.json\` has \`integrations.qmd.enabled\`, use \`qmd search --json\` for keyword candidate discovery only.
+2. ${QMD_QUERY_WORKFLOW_STEP}
 3. Search \`wiki/\` with \`rg\`; markdown remains the source of truth.
 4. Read matching source, topic, entity, concept, and question pages.
 5. Answer with citations to wiki page paths.

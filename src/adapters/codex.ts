@@ -1,4 +1,5 @@
 import type { HostAdapter } from "../core/types.js";
+import { QMD_QUERY_WORKFLOW_STEP } from "./qmd-instructions.js";
 
 export function codexAdapter(): HostAdapter {
   return {
@@ -60,7 +61,7 @@ Use this skill when answering questions against a local LLM wiki vault.
 ## Workflow
 
 1. Read \`wiki/index.md\` first and \`docs/llm-wiki-routing.md\` when present.
-2. If \`.llm-wiki-skills.json\` has \`integrations.qmd.enabled\`, use \`qmd search --json\` for keyword candidate discovery only.
+2. ${QMD_QUERY_WORKFLOW_STEP}
 3. Search \`wiki/\` with \`rg\` for relevant source and synthesis pages; markdown remains the source of truth.
 4. Read the source pages behind any claim you plan to use.
 5. Answer with citations to wiki page paths.

@@ -26,7 +26,7 @@ export interface PromptRuntime {
   selectHosts(choices: HostPromptChoice[]): Promise<HostId[]>;
   selectTopic(choices: TopicPromptChoice[]): Promise<TopicSelectionId>;
   text(message: string, initial?: string): Promise<string>;
-  confirm(message: string, initial?: boolean): Promise<boolean>;
+  confirm(message: string, initial?: boolean, hint?: string): Promise<boolean>;
 }
 
 export interface PromptRuntimeOptions {
@@ -41,6 +41,7 @@ export interface ScriptedPromptAnswers {
   customTopic?: string;
   obsidian?: boolean;
   qmd?: boolean;
+  qmdCpu?: boolean;
   qmdInstall?: boolean;
   confirm?: boolean;
   cancel?: "hosts" | "topic" | "text" | "confirm";
@@ -64,12 +65,28 @@ interface EnquirerTogglePrompt {
   value: boolean;
   disabled: string;
   enabled: string;
+  margin: string[];
+  state: {
+    size: number;
+    prompt?: string;
+  };
   styles: {
     primary: {
       underline(value: string): string;
     };
     muted(value: string): string;
   };
+  clear(lines?: number): void;
+  error(): Promise<string>;
+  footer(): Promise<string>;
+  header(): Promise<string>;
+  hint(): Promise<string>;
+  message(): Promise<string>;
+  prefix(): Promise<string>;
+  render(): Promise<void>;
+  restore(): void;
+  separator(): Promise<string>;
+  write(value: string): void;
 }
 
 type PromptsFunction = (question: unknown, options?: unknown) => Promise<Record<string, unknown>>;
@@ -137,6 +154,7 @@ export function createScriptedPromptRuntime(script: ScriptedPromptAnswers, optio
       if (message.startsWith("Set up Obsidian")) return script.obsidian ?? initial;
       if (message.startsWith("Set up qmd")) return script.qmd ?? initial;
       if (message === "Allow to install qmd by `npm install -g @tobilu/qmd`?") return script.qmdInstall ?? initial;
+      if (message.startsWith("qmd semantic setup could not use GPU acceleration")) return script.qmdCpu ?? initial;
       return script.confirm ?? true;
     }
   };
@@ -249,7 +267,7 @@ class LibraryPromptRuntime implements PromptRuntime {
     return answers.value;
   }
 
-  async confirm(message: string, initial = true): Promise<boolean> {
+  async confirm(message: string, initial = true, hint?: string): Promise<boolean> {
     const Enquirer = await loadEnquirer();
     const enquirer = new Enquirer();
     enquirer.register("yes-no-toggle", createYesNoTogglePrompt(Enquirer.prompts.Toggle));
@@ -260,6 +278,7 @@ class LibraryPromptRuntime implements PromptRuntime {
         message,
         enabled: "Yes",
         disabled: "No",
+        ...(hint ? { hint } : {}),
         initial,
         stdin: this.input,
         stdout: this.output
@@ -278,6 +297,24 @@ function createYesNoTogglePrompt(TogglePrompt: EnquirerPromptConstructor): Enqui
       const active = (value: string) => this.styles.primary.underline(value);
       const value = [this.value ? active(this.enabled) : this.enabled, this.value ? this.disabled : active(this.disabled)];
       return value.join(this.styles.muted(" / "));
+    }
+
+    async render(): Promise<void> {
+      const { size } = this.state;
+      const header = await this.header();
+      const prefix = await this.prefix();
+      const separator = await this.separator();
+      const message = await this.message();
+      const output = await this.format();
+      const help = (await this.error()) || (await this.hint());
+      const footer = await this.footer();
+      let prompt = [prefix, message, separator, output].join(" ");
+      this.state.prompt = prompt;
+      if (help && !prompt.includes(help)) prompt += `\n${help}`;
+      this.clear(size);
+      this.write([header, prompt, footer].filter(Boolean).join("\n"));
+      this.write(this.margin[2] ?? "");
+      this.restore();
     }
   };
 }
@@ -319,10 +356,11 @@ function readScriptedPromptAnswers(): ScriptedPromptAnswers | undefined {
   const customTopic = typeof parsed.customTopic === "string" ? parsed.customTopic : undefined;
   const obsidian = typeof parsed.obsidian === "boolean" ? parsed.obsidian : undefined;
   const qmd = typeof parsed.qmd === "boolean" ? parsed.qmd : undefined;
+  const qmdCpu = typeof parsed.qmdCpu === "boolean" ? parsed.qmdCpu : undefined;
   const qmdInstall = typeof parsed.qmdInstall === "boolean" ? parsed.qmdInstall : undefined;
   const confirm = typeof parsed.confirm === "boolean" ? parsed.confirm : undefined;
   const cancel = parsed.cancel === "hosts" || parsed.cancel === "topic" || parsed.cancel === "text" || parsed.cancel === "confirm" ? parsed.cancel : undefined;
-  return { hosts, topic, customTopic, obsidian, qmd, qmdInstall, confirm, cancel };
+  return { hosts, topic, customTopic, obsidian, qmd, qmdCpu, qmdInstall, confirm, cancel };
 }
 
 function hostHint(host: HostId): string {

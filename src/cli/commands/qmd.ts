@@ -37,7 +37,18 @@ function printQmdResult(result: QmdLifecycleResult, options: CommandOptions): vo
 }
 
 function renderQmdResult(result: QmdLifecycleResult): string {
-  return [`qmd: ${result.status}`, `Root: ${result.root}`, `Collection: ${result.collection}`, result.message, ""].join("\n");
+  return [
+    `qmd: ${result.status}`,
+    `Root: ${result.root}`,
+    `Collection: ${result.collection}`,
+    result.searchMode ? `Search mode: ${result.searchMode}` : undefined,
+    result.runtimeMode ? `Runtime mode: ${result.runtimeMode}` : undefined,
+    result.fallbackReason ? `Fallback reason: ${result.fallbackReason}` : undefined,
+    result.message,
+    ""
+  ]
+    .filter((line): line is string => typeof line === "string")
+    .join("\n");
 }
 
 function fixedNow(): Date | undefined {

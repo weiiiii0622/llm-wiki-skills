@@ -53,16 +53,42 @@ export interface ManifestIntegrations {
     schemaVersion: 1;
     generatedFiles: string[];
   };
-  qmd?: {
-    enabled: true;
-    schemaVersion: 1;
-    collection: string;
-    root: string;
-    docsPath: string;
-    searchMode: "keyword";
-    lastIndexedAt?: string;
-  };
+  qmd?: QmdIntegrationMetadata;
 }
+
+export type QmdSearchMode = "keyword" | "hybrid";
+export type QmdRuntimeMode = "gpu-auto" | "cpu-forced" | "keyword-fallback";
+
+export interface QmdModelMetadata {
+  name: string;
+  purpose: "embedding" | "reranking" | "query-expansion";
+  size: string;
+}
+
+export type QmdIntegrationMetadata =
+  | {
+      enabled: true;
+      schemaVersion: 1;
+      collection: string;
+      root: string;
+      docsPath: string;
+      searchMode: "keyword";
+      lastIndexedAt?: string;
+    }
+  | {
+      enabled: true;
+      schemaVersion: 2;
+      collection: string;
+      root: string;
+      docsPath: string;
+      searchMode: QmdSearchMode;
+      runtimeMode: QmdRuntimeMode;
+      models: QmdModelMetadata[];
+      modelCachePath: string;
+      lastIndexedAt?: string;
+      lastEmbeddedAt?: string;
+      fallbackReason?: string;
+    };
 
 export interface WikiPage {
   id: string;

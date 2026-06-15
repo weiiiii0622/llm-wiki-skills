@@ -13,8 +13,8 @@ import {
 } from "./errors.js";
 import { atomicWriteText, pathExists, stableJson } from "./fs.js";
 import { loadManifest, MANIFEST_PATH, requiredFileRegistry } from "./manifest.js";
-import { QMD_DOCS_PATH, qmdCollectionName, qmdIntegrationMetadata } from "./qmd-metadata.js";
-import type { Manifest, ManifestIntegrations } from "./types.js";
+import { QMD_DOCS_PATH, QMD_MODEL_CACHE_PATH, QMD_MODELS, qmdCollectionName, qmdIntegrationMetadata } from "./qmd-metadata.js";
+import type { Manifest, ManifestIntegrations, QmdRuntimeMode, QmdSearchMode } from "./types.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -29,11 +29,17 @@ export interface QmdRunner {
 
 export interface QmdRunOptions {
   dimOutput?: boolean;
+  env?: NodeJS.ProcessEnv;
   showCommand?: boolean;
   streamOutput?: boolean;
+  suppressOutput?: boolean;
 }
 
+export type QmdSemanticFailureKind = "gpu" | "model-download" | "qmd-missing" | "node-unsupported" | "generic";
+export type QmdGpuFallbackChoice = "cpu" | "keyword";
+
 export interface QmdEnableOptions {
+  gpuFallback?: (message: string) => Promise<QmdGpuFallbackChoice>;
   install?: boolean;
   runner?: QmdRunner;
   showCommands?: boolean;
@@ -46,9 +52,28 @@ export interface QmdLifecycleResult {
   docsPath: string;
   status: "enabled" | "disabled" | "reindexed";
   message: string;
+  fallbackReason?: string;
+  lastEmbeddedAt?: string;
+  lastIndexedAt?: string;
+  runtimeMode?: QmdRuntimeMode;
+  searchMode?: QmdSearchMode;
 }
 
-export function qmdDocsContent(collection: string): string {
+export function qmdDocsContent(collection: string, searchMode: QmdSearchMode = "hybrid", runtimeMode: QmdRuntimeMode = "gpu-auto"): string {
+  const command =
+    searchMode === "hybrid" && runtimeMode === "cpu-forced"
+      ? "QMD_FORCE_CPU=1 qmd query --json"
+      : searchMode === "hybrid"
+        ? "qmd query --json"
+        : "qmd search --json";
+  const contract =
+    searchMode === "hybrid"
+      ? "Use `qmd query --json` for hybrid candidate discovery. If runtime mode is CPU-forced, run it with `QMD_FORCE_CPU=1`."
+      : "Use `qmd search --json` for full-text candidate discovery.";
+  const modelIntro =
+    searchMode === "hybrid"
+      ? `qmd semantic setup downloads GGUF models on first use and caches them in \`${QMD_MODEL_CACHE_PATH}\`:`
+      : `Hybrid semantic mode uses these local GGUF models when enabled. Current mode is full-text fallback, so \`qmd search --json\` does not require them:`;
   return `# LLM Wiki qmd
 
 qmd is enabled as an optional search accelerator for this wiki.
@@ -64,9 +89,17 @@ Markdown remains the source of truth. Always read \`wiki/index.md\` first, then 
 ## Search Contract
 
 - Collection: \`${collection}\`
-- Search mode: keyword
-- Use \`qmd search --json\` for candidate discovery.
-- Do not rely on embeddings or semantic qmd query behavior for this wiki.
+- Search mode: ${searchMode}
+- Runtime mode: ${runtimeMode}
+- Default agent command: \`${command}\`
+- ${contract}
+- Always read matching markdown files before answering or citing claims.
+
+## Local Models
+
+${modelIntro}
+
+${QMD_MODELS.map((model) => `- ${model.name} (${model.purpose}, ${model.size})`).join("\n")}
 
 Disabling qmd leaves external qmd indexes and collections untouched.
 `;
@@ -78,7 +111,7 @@ export class ExecFileQmdRunner implements QmdRunner {
     try {
       const result = await execFileAsync(command, args, {
         cwd,
-        env: childEnv(cwd),
+        env: childEnv(cwd, options.env),
         shell: false,
         windowsHide: true,
         maxBuffer: 1024 * 1024
@@ -103,17 +136,23 @@ export async function enableQmd(root: string, options: QmdEnableOptions = {}): P
   const collection = qmdCollectionName(resolvedRoot);
   await addQmdCollection(runner, resolvedRoot, collection, runOptions);
   await runQmdStep(runner, resolvedRoot, ["update"], (message) => new QmdIndexUpdateError(message), "qmd", runOptions);
-
   const indexedAt = (options.now ?? new Date()).toISOString();
-  await atomicWriteText(resolvedRoot, QMD_DOCS_PATH, qmdDocsContent(collection));
-  await writeQmdEnabledManifest(resolvedRoot, indexedAt);
+  const semantic = await runQmdEmbed(runner, resolvedRoot, options, runOptions);
+
+  await atomicWriteText(resolvedRoot, QMD_DOCS_PATH, qmdDocsContent(collection, semantic.searchMode, semantic.runtimeMode));
+  await writeQmdEnabledManifest(resolvedRoot, indexedAt, semantic, collection);
 
   return {
     root: resolvedRoot,
     collection,
     docsPath: QMD_DOCS_PATH,
     status: "enabled",
-    message: "qmd enabled. Markdown remains the source of truth; qmd is used for keyword candidate discovery."
+    searchMode: semantic.searchMode,
+    runtimeMode: semantic.runtimeMode,
+    lastIndexedAt: indexedAt,
+    ...(semantic.searchMode === "hybrid" ? { lastEmbeddedAt: indexedAt } : {}),
+    ...(semantic.fallbackReason ? { fallbackReason: semantic.fallbackReason } : {}),
+    message: qmdReadyMessage(semantic.searchMode, semantic.runtimeMode)
   };
 }
 
@@ -123,14 +162,28 @@ export async function reindexQmd(root: string, options: Pick<QmdEnableOptions, "
   const qmd = manifest.integrations?.qmd;
   if (!qmd?.enabled) throw new QmdCommandError("qmd is not enabled for this wiki. Run `llm-wiki-skills qmd enable` first.");
   const runner = options.runner ?? new ExecFileQmdRunner();
-  await runQmdStep(runner, resolvedRoot, ["update"], (message) => new QmdIndexUpdateError(message), "qmd", commandDisplayOptions(options.showCommands));
+  const runOptions = commandDisplayOptions(options.showCommands);
+  await runQmdStep(runner, resolvedRoot, ["update"], (message) => new QmdIndexUpdateError(message), "qmd", runOptions);
   const indexedAt = (options.now ?? new Date()).toISOString();
-  await writeQmdEnabledManifest(resolvedRoot, indexedAt);
+  const semantic = existingSemanticState(qmd);
+  if (semantic.searchMode === "hybrid") {
+    await runQmdStep(runner, resolvedRoot, ["embed"], (message) => new QmdCommandError(message), "qmd", {
+      ...embedRunOptions(runOptions),
+      ...(semantic.runtimeMode === "cpu-forced" ? { env: { QMD_FORCE_CPU: "1" } } : {})
+    });
+  }
+  await atomicWriteText(resolvedRoot, QMD_DOCS_PATH, qmdDocsContent(qmd.collection, semantic.searchMode, semantic.runtimeMode));
+  await writeQmdEnabledManifest(resolvedRoot, indexedAt, semantic, qmd.collection);
   return {
     root: resolvedRoot,
     collection: qmd.collection,
     docsPath: qmd.docsPath,
     status: "reindexed",
+    searchMode: semantic.searchMode,
+    runtimeMode: semantic.runtimeMode,
+    lastIndexedAt: indexedAt,
+    ...(semantic.searchMode === "hybrid" ? { lastEmbeddedAt: indexedAt } : {}),
+    ...(semantic.fallbackReason ? { fallbackReason: semantic.fallbackReason } : {}),
     message: "qmd reindexed from markdown wiki files."
   };
 }
@@ -146,6 +199,8 @@ export async function disableQmd(root: string): Promise<QmdLifecycleResult> {
     collection: qmd?.collection ?? qmdCollectionName(resolvedRoot),
     docsPath: QMD_DOCS_PATH,
     status: "disabled",
+    searchMode: qmd?.searchMode,
+    runtimeMode: qmd?.schemaVersion === 2 ? qmd.runtimeMode : undefined,
     message: "qmd disabled in llm-wiki-skills metadata. External qmd indexes and collections were left untouched."
   };
 }
@@ -168,7 +223,12 @@ export async function qmdStatus(root: string): Promise<QmdLifecycleResult> {
     collection: qmd.collection,
     docsPath: qmd.docsPath,
     status: "enabled",
-    message: `qmd is enabled for keyword search. Last indexed: ${qmd.lastIndexedAt ?? "unknown"}.`
+    searchMode: qmd.searchMode,
+    runtimeMode: qmd.schemaVersion === 2 ? qmd.runtimeMode : "keyword-fallback",
+    lastIndexedAt: qmd.lastIndexedAt,
+    ...(qmd.schemaVersion === 2 && qmd.lastEmbeddedAt ? { lastEmbeddedAt: qmd.lastEmbeddedAt } : {}),
+    ...(qmd.schemaVersion === 2 && qmd.fallbackReason ? { fallbackReason: qmd.fallbackReason } : {}),
+    message: `qmd is enabled for ${qmd.searchMode} search. Last indexed: ${qmd.lastIndexedAt ?? "unknown"}.`
   };
 }
 
@@ -180,6 +240,66 @@ export async function installQmdPackage(root: string, runner: QmdRunner = new Ex
     dimOutput: true,
     streamOutput: true
   });
+}
+
+export function classifyQmdSemanticFailure(message: string): QmdSemanticFailureKind {
+  if (/not found|enoent|command not found|spawn qmd/i.test(message)) return "qmd-missing";
+  if (/node(?:\.js)?\s*(?:>=|version|v)?\s*22|requires node/i.test(message)) return "node-unsupported";
+  if (/cuda|vulkan|metal|gpu|ggml[-_](?:cuda|metal)|no gpu|backend/i.test(message)) return "gpu";
+  if (/hugging\s*face|huggingface|download|network|offline|cache miss|model.+not found|eai_again|enotfound|timed out|fetch failed/i.test(message)) return "model-download";
+  return "generic";
+}
+
+interface QmdSemanticState {
+  fallbackReason?: string;
+  runtimeMode: QmdRuntimeMode;
+  searchMode: QmdSearchMode;
+}
+
+async function runQmdEmbed(runner: QmdRunner, root: string, options: QmdEnableOptions, runOptions: QmdRunOptions): Promise<QmdSemanticState> {
+  try {
+    await runQmdStep(runner, root, ["embed"], (message) => new QmdCommandError(message), "qmd", embedRunOptions(runOptions));
+    return { searchMode: "hybrid", runtimeMode: "gpu-auto" };
+  } catch (error) {
+    if (!(error instanceof QmdCommandError)) throw error;
+    const kind = classifyQmdSemanticFailure(error.message);
+    if (kind !== "gpu") throw error;
+    const choice = options.gpuFallback ? await options.gpuFallback(error.message) : "cpu";
+    if (choice === "keyword") {
+      return { searchMode: "keyword", runtimeMode: "keyword-fallback", fallbackReason: error.message };
+    }
+    await runQmdStep(runner, root, ["embed"], (message) => new QmdCommandError(message), "qmd", {
+      ...embedRunOptions(runOptions),
+      env: { QMD_FORCE_CPU: "1" }
+    });
+    return { searchMode: "hybrid", runtimeMode: "cpu-forced" };
+  }
+}
+
+function embedRunOptions(options: QmdRunOptions): QmdRunOptions {
+  return {
+    ...options,
+    dimOutput: true,
+    streamOutput: true,
+    suppressOutput: !options.showCommand
+  };
+}
+
+function existingSemanticState(qmd: NonNullable<ManifestIntegrations["qmd"]>): QmdSemanticState {
+  if (qmd.schemaVersion === 1) {
+    return { searchMode: "hybrid", runtimeMode: "gpu-auto" };
+  }
+  return {
+    searchMode: qmd.searchMode,
+    runtimeMode: qmd.runtimeMode,
+    ...(qmd.fallbackReason ? { fallbackReason: qmd.fallbackReason } : {})
+  };
+}
+
+function qmdReadyMessage(searchMode: QmdSearchMode, runtimeMode: QmdRuntimeMode): string {
+  if (searchMode === "keyword") return "qmd enabled in full-text fallback mode. Markdown remains the source of truth; qmd search is used for candidate discovery.";
+  if (runtimeMode === "cpu-forced") return "qmd enabled for hybrid semantic search in CPU mode. Markdown remains the source of truth.";
+  return "qmd enabled for hybrid semantic search. Markdown remains the source of truth.";
 }
 
 async function addQmdCollection(runner: QmdRunner, root: string, collection: string, options: QmdRunOptions = {}): Promise<void> {
@@ -213,7 +333,7 @@ function runStreaming(command: string, args: string[], cwd: string, options: Qmd
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd,
-      env: childEnv(cwd),
+      env: childEnv(cwd, options.env),
       shell: false,
       windowsHide: true,
       stdio: ["ignore", "pipe", "pipe"]
@@ -224,11 +344,11 @@ function runStreaming(command: string, args: string[], cwd: string, options: Qmd
     child.stderr.setEncoding("utf8");
     child.stdout.on("data", (chunk: string) => {
       stdout += chunk;
-      writeStreamingOutput(process.stdout, chunk, options);
+      if (!options.suppressOutput) writeStreamingOutput(process.stdout, chunk, options);
     });
     child.stderr.on("data", (chunk: string) => {
       stderr += chunk;
-      writeStreamingOutput(process.stderr, chunk, options);
+      if (!options.suppressOutput) writeStreamingOutput(process.stderr, chunk, options);
     });
     child.on("error", (error) => {
       if (isNodeUnsupported(error)) reject(new QmdRuntimeUnsupportedError());
@@ -246,8 +366,8 @@ function commandDisplayOptions(showCommands: boolean | undefined): QmdRunOptions
   return showCommands ? { showCommand: true } : {};
 }
 
-function childEnv(cwd: string): NodeJS.ProcessEnv {
-  return { ...process.env, PWD: childPwd(cwd) };
+function childEnv(cwd: string, env: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  return { ...process.env, ...env, PWD: childPwd(cwd) };
 }
 
 function childPwd(cwd: string): string {
@@ -287,9 +407,9 @@ function writeDimmedOutput(stream: NodeJS.WriteStream, value: string): void {
   stream.write(stream.isTTY ? `\x1b[2m${value}\x1b[22m` : value);
 }
 
-async function writeQmdEnabledManifest(root: string, indexedAt: string): Promise<void> {
+async function writeQmdEnabledManifest(root: string, indexedAt: string, semantic: QmdSemanticState, collection: string): Promise<void> {
   const manifest = await loadManifest(root);
-  const integrations = { ...manifest.integrations, qmd: qmdIntegrationMetadata(root, indexedAt) };
+  const integrations = { ...manifest.integrations, qmd: qmdIntegrationMetadata(root, { collection, indexedAt, ...semantic }) };
   await writeManifestWithIntegrations(root, manifest, integrations);
 }
 

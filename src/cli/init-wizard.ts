@@ -1,11 +1,12 @@
 import { HostSelectionCanceledError } from "../core/errors.js";
 import { getHostAdapter } from "../core/hosts.js";
 import { installQmdPackage } from "../core/qmd.js";
+import { QMD_DOCS_PATH } from "../core/qmd-metadata.js";
 import { getTopicTemplate, TOPIC_TEMPLATE_IDS, type ResolvedTopicSelection, type TopicSelectionId } from "../core/topic-templates.js";
 import type { HostId } from "../core/types.js";
 import { buildInitPlan, groupInitPlanFiles, type InitFileGroupId, type InitPlan } from "./init-plan.js";
 import { createPromptRuntime, hostPromptChoices, type PromptRuntime, type TopicPromptChoice } from "./prompt-runtime.js";
-import { QMD_INSTALL_PROMPT } from "./qmd-install.js";
+import { QMD_INSTALL_PROMPT, QMD_SETUP_HINT, QMD_SETUP_PROMPT } from "./qmd-install.js";
 
 export interface InitPreviewModel {
   root: string;
@@ -22,7 +23,7 @@ export interface InitPreviewModel {
 }
 
 export interface InitPreviewGroup {
-  id: InitFileGroupId | "topic-directory" | "managed";
+  id: InitFileGroupId | "topic-directory" | "qmd" | "managed";
   label: string;
   files: string[];
 }
@@ -42,7 +43,7 @@ export async function runInitWizard(
   const hosts = await runtime.selectHosts(hostPromptChoices());
   const topic = fixedTopic ?? (await selectTopic(runtime));
   const obsidianEnabled = fixedObsidianEnabled ?? (await runtime.confirm("Set up Obsidian vault metadata and graph view?", true));
-  const qmdEnabled = fixedQmdEnabled ?? (await runtime.confirm("Set up qmd keyword search acceleration?", false));
+  const qmdEnabled = fixedQmdEnabled ?? (await runtime.confirm(QMD_SETUP_PROMPT, false, QMD_SETUP_HINT));
   let qmdInstallApproved: boolean | undefined = false;
   if (qmdEnabled) {
     qmdInstallApproved = await runtime.confirm(QMD_INSTALL_PROMPT, false);
@@ -82,6 +83,15 @@ export function buildInitPreviewModel(plan: InitPlan): InitPreviewModel {
         label: groupLabel(id),
         files: grouped[id].map((file) => file.relativePath).sort()
       })),
+      ...(plan.qmdEnabled
+        ? [
+            {
+              id: "qmd" as const,
+              label: "qmd local search files",
+              files: [".qmd/", QMD_DOCS_PATH]
+            }
+          ]
+        : []),
       {
         id: "managed" as const,
         label: "Managed repo hygiene",

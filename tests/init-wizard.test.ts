@@ -4,7 +4,7 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { HostSelectionCanceledError } from "../src/core/errors.js";
 import { buildInitPreviewModel, renderInitPreview, runInitWizard } from "../src/cli/init-wizard.js";
-import { buildInitPlan, executeInitPlan } from "../src/cli/init-plan.js";
+import { buildInitPlan, defaultTopicSelection, executeInitPlan } from "../src/cli/init-plan.js";
 import {
   ENTER_ALTERNATE_SCREEN,
   EXIT_ALTERNATE_SCREEN,
@@ -13,6 +13,7 @@ import {
   hostPromptChoices,
   topicOptionsPerPage
 } from "../src/cli/prompt-runtime.js";
+import { QMD_SETUP_HINT, QMD_SETUP_PROMPT } from "../src/cli/qmd-install.js";
 import { TOPIC_TEMPLATE_IDS, getTopicTemplate } from "../src/core/topic-templates.js";
 
 const promptsMock = vi.hoisted(() => {
@@ -30,13 +31,42 @@ const enquirerMock = vi.hoisted(() => {
   class TogglePrompt {
     public disabled = "No";
     public enabled = "Yes";
+    public margin = ["", "", ""];
+    public rendered = "";
+    public state = { size: 0, prompt: "" };
     public value = true;
     public styles = {
       primary: {
         underline: (value: string) => `[${value}]`
       },
-      muted: (value: string) => value
+      muted: (value: string) => `<muted>${value}</muted>`
     };
+    async header(): Promise<string> {
+      return "";
+    }
+    async prefix(): Promise<string> {
+      return "?";
+    }
+    async separator(): Promise<string> {
+      return "";
+    }
+    async message(): Promise<string> {
+      return "Set up qmd hybrid semantic search?";
+    }
+    async error(): Promise<string> {
+      return "";
+    }
+    async hint(): Promise<string> {
+      return this.styles.muted("Runs `qmd embed` and may download ~2GB of local models. CPU fallback available.");
+    }
+    async footer(): Promise<string> {
+      return "";
+    }
+    clear(): void {}
+    write(value: string): void {
+      this.rendered += value;
+    }
+    restore(): void {}
   }
   const instance = {
     prompt: vi.fn(),
@@ -143,6 +173,15 @@ describe("init preview", () => {
     expect(preview).toContain("◆");
     expect(preview).toMatch(/\x1b\[/);
   });
+
+  it("shows qmd-managed files when qmd setup is enabled", () => {
+    const preview = renderInitPreview(buildInitPreviewModel(buildInitPlan("/tmp/wiki", ["codex"], defaultTopicSelection(), true, true)));
+
+    expect(preview).toContain("qmd enabled after setup");
+    expect(preview).toContain("qmd local search files (2)");
+    expect(preview).toContain(".qmd/");
+    expect(preview).toContain("docs/llm-wiki-qmd.md");
+  });
 });
 
 describe("init wizard", () => {
@@ -179,7 +218,7 @@ describe("init wizard", () => {
     const runtime = createPromptRuntime({ output: { write: vi.fn() } as unknown as NodeJS.WriteStream });
 
     await expect(runtime.confirm("Create these LLM Wiki skill files?", true)).resolves.toBe(true);
-    await expect(runtime.confirm("Set up qmd keyword search acceleration?", false)).resolves.toBe(false);
+    await expect(runtime.confirm(QMD_SETUP_PROMPT, false, QMD_SETUP_HINT)).resolves.toBe(false);
 
     expect(enquirerMock.prompt).toHaveBeenNthCalledWith(
       1,
@@ -197,7 +236,8 @@ describe("init wizard", () => {
       expect.objectContaining({
         type: "yes-no-toggle",
         name: "confirmed",
-        message: "Set up qmd keyword search acceleration?",
+        message: QMD_SETUP_PROMPT,
+        hint: QMD_SETUP_HINT,
         enabled: "Yes",
         disabled: "No",
         initial: false
@@ -206,9 +246,12 @@ describe("init wizard", () => {
     expect(enquirerMock.register).toHaveBeenCalledWith("yes-no-toggle", expect.any(Function));
     const YesNoTogglePrompt = enquirerMock.register.mock.calls[0]?.[1] as typeof enquirerMock.TogglePrompt;
     const enabled = new YesNoTogglePrompt();
-    expect(enabled.format()).toBe("[Yes] / No");
+    expect(enabled.format()).toBe("[Yes]<muted> / </muted>No");
     enabled.value = false;
-    expect(enabled.format()).toBe("Yes / [No]");
+    expect(enabled.format()).toBe("Yes<muted> / </muted>[No]");
+    await enabled.render();
+    expect(enabled.rendered).toContain("? Set up qmd hybrid semantic search?  Yes<muted> / </muted>[No]");
+    expect(enabled.rendered).toContain("\n<muted>Runs `qmd embed` and may download ~2GB of local models. CPU fallback available.</muted>");
     expect(promptsMock.prompt).not.toHaveBeenCalled();
   });
 
@@ -327,7 +370,7 @@ describe("init wizard", () => {
       text: vi.fn(async () => ""),
       confirm: vi.fn(async (message: string) => {
         confirmMessages.push(message);
-        if (message === "Set up qmd keyword search acceleration?") return true;
+        if (message.startsWith("Set up qmd hybrid semantic search?")) return true;
         if (message === "Allow to install qmd by `npm install -g @tobilu/qmd`?") return false;
         return true;
       })
@@ -337,10 +380,11 @@ describe("init wizard", () => {
 
     expect(confirmMessages).toEqual([
       "Set up Obsidian vault metadata and graph view?",
-      "Set up qmd keyword search acceleration?",
+      QMD_SETUP_PROMPT,
       "Allow to install qmd by `npm install -g @tobilu/qmd`?",
       "Create these LLM Wiki skill files?"
     ]);
+    expect(runtime.confirm).toHaveBeenCalledWith(QMD_SETUP_PROMPT, false, QMD_SETUP_HINT);
     expect(plan.qmdEnabled).toBe(true);
     expect(plan.qmdInstallApproved).toBe(false);
   });

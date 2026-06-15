@@ -289,19 +289,24 @@ describe("cli", () => {
     const output = JSON.parse(result.stdout);
     expect(output.qmd).toBe(true);
     expect(output.qmdStatus.status).toBe("enabled");
-    expect(output.qmdStatus.message).toContain("keyword candidate discovery");
+    expect(output.qmdStatus.message).toContain("hybrid semantic search");
     const manifest = JSON.parse(await readFile(path.join(root, ".llm-wiki-skills.json"), "utf8"));
     expect(manifest.integrations.qmd).toMatchObject({
       enabled: true,
-      schemaVersion: 1,
+      schemaVersion: 2,
       docsPath: "docs/llm-wiki-qmd.md",
-      searchMode: "keyword",
-      lastIndexedAt: "2026-06-10T00:00:00.000Z"
+      searchMode: "hybrid",
+      runtimeMode: "gpu-auto",
+      lastIndexedAt: "2026-06-10T00:00:00.000Z",
+      lastEmbeddedAt: "2026-06-10T00:00:00.000Z"
     });
     expect(manifest.integrations.qmd.collection).toMatch(/^llm-wiki-[a-f0-9]{12}$/);
     expect(manifest.files).toContain("docs/llm-wiki-qmd.md");
-    await expect(readFile(path.join(root, "docs/llm-wiki-qmd.md"), "utf8")).resolves.toContain("qmd search --json");
-    expect(await readFile(fake.log, "utf8")).toContain("collection add");
+    await expect(readFile(path.join(root, "docs/llm-wiki-qmd.md"), "utf8")).resolves.toContain("qmd query --json");
+    const qmdLog = await readFile(fake.log, "utf8");
+    expect(qmdLog).toContain("collection add");
+    expect(qmdLog).toContain("qmd update");
+    expect(qmdLog).toContain("qmd embed");
   });
 
   it("init --qmd prompts to install qmd when missing and user accepts", async () => {
@@ -316,7 +321,7 @@ describe("cli", () => {
     expect(await readFile(fake.log, "utf8")).toContain("npm install -g @tobilu/qmd");
     expect(await readFile(fake.log, "utf8")).toContain(`npm-cwd ${await realpath(root)}`);
     const manifest = JSON.parse(await readFile(path.join(root, ".llm-wiki-skills.json"), "utf8"));
-    expect(manifest.integrations.qmd).toMatchObject({ enabled: true, searchMode: "keyword" });
+    expect(manifest.integrations.qmd).toMatchObject({ enabled: true, searchMode: "hybrid", runtimeMode: "gpu-auto" });
   });
 
   it("interactive init installs qmd before preview and create confirmation", async () => {
@@ -339,7 +344,7 @@ describe("cli", () => {
     expect(await readFile(fake.log, "utf8")).toContain("npm install -g @tobilu/qmd");
     expect(await readFile(fake.log, "utf8")).toContain(`npm-cwd ${await realpath(root)}`);
     const manifest = JSON.parse(await readFile(path.join(root, ".llm-wiki-skills.json"), "utf8"));
-    expect(manifest.integrations.qmd).toMatchObject({ enabled: true, searchMode: "keyword" });
+    expect(manifest.integrations.qmd).toMatchObject({ enabled: true, searchMode: "hybrid", runtimeMode: "gpu-auto" });
   });
 
   it("init --qmd reports qmd enable follow-up when user declines installation", async () => {
@@ -389,10 +394,12 @@ describe("cli", () => {
     expect(enabled.stdout).toContain("Running `qmd collection add");
     expect(enabled.stdout).toContain(" --name ");
     expect(enabled.stdout).toContain("Running `qmd update`...");
+    expect(enabled.stdout).toContain("Running `qmd embed`...");
     expect(enabled.stdout).toContain("qmd: enabled");
 
     const reindexed = await execaNode(["dist/cli/index.js", "qmd", "reindex", "--root", root], fixedEnv(undefined, fake.env));
     expect(reindexed.stdout).toContain("Running `qmd update`...");
+    expect(reindexed.stdout).toContain("Running `qmd embed`...");
     expect(reindexed.stdout).toContain("qmd: reindexed");
   });
 
@@ -438,6 +445,139 @@ describe("cli", () => {
     expect(JSON.parse(reenabled.stdout)).toMatchObject({ status: "enabled" });
     const manifest = JSON.parse(await readFile(path.join(root, ".llm-wiki-skills.json"), "utf8"));
     expect(manifest.integrations.qmd).toMatchObject({ enabled: true });
+  });
+
+  it("init --qmd embeds only after generated wiki files exist", async () => {
+    const root = await tempRoot("llm-wiki-qmd-embed-order-");
+    const fake = await fakeQmdEnv();
+
+    await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--qmd", "--json"], fixedEnv(undefined, fake.env));
+
+    const log = await readFile(fake.log, "utf8");
+    expect(log).toContain("embed-wiki exists");
+    expect(log.indexOf("qmd collection add")).toBeLessThan(log.indexOf("qmd update"));
+    expect(log.indexOf("qmd update")).toBeLessThan(log.indexOf("qmd embed"));
+  });
+
+  it("non-interactive semantic setup retries qmd embed in CPU mode after GPU failure", async () => {
+    const root = await tempRoot("llm-wiki-qmd-cpu-fallback-");
+    const fake = await fakeQmdEnv();
+
+    const enabled = await execaNode(
+      ["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--qmd", "--json"],
+      fixedEnv(undefined, { ...fake.env, QMD_EMBED_GPU_FAIL: "1" })
+    );
+
+    expect(enabled.stdout).not.toContain("embedding progress");
+    const output = JSON.parse(enabled.stdout);
+    expect(output.qmdStatus).toMatchObject({ searchMode: "hybrid", runtimeMode: "cpu-forced" });
+    const manifest = JSON.parse(await readFile(path.join(root, ".llm-wiki-skills.json"), "utf8"));
+    expect(manifest.integrations.qmd).toMatchObject({ searchMode: "hybrid", runtimeMode: "cpu-forced" });
+    const log = await readFile(fake.log, "utf8");
+    expect(log.match(/qmd embed/g)).toHaveLength(2);
+    expect(log).toContain("embed-cpu 1");
+  });
+
+  it("quiet semantic setup suppresses qmd embed progress", async () => {
+    const root = await tempRoot("llm-wiki-qmd-quiet-semantic-");
+    const fake = await fakeQmdEnv();
+
+    const result = await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--qmd", "--quiet"], fixedEnv(undefined, fake.env));
+
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toBe("");
+    expect(await readFile(fake.log, "utf8")).toContain("qmd embed");
+  });
+
+  it("interactive semantic setup can fall back to qmd full-text search after GPU failure", async () => {
+    const root = await tempRoot("llm-wiki-qmd-keyword-fallback-");
+    const fake = await fakeQmdEnv();
+
+    await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--no-qmd", "--quiet"], fixedEnv());
+    const fallback = await execaNode(
+      ["dist/cli/index.js", "qmd", "enable", "--root", root],
+      fixedEnv({ qmdCpu: false }, { ...fake.env, QMD_EMBED_GPU_FAIL: "1" })
+    );
+
+    expect(fallback.stdout).toContain("Search mode: keyword");
+    expect(fallback.stdout).toContain("Runtime mode: keyword-fallback");
+    const manifest = JSON.parse(await readFile(path.join(root, ".llm-wiki-skills.json"), "utf8"));
+    expect(manifest.integrations.qmd).toMatchObject({ schemaVersion: 2, searchMode: "keyword", runtimeMode: "keyword-fallback" });
+    expect(await readFile(path.join(root, "docs/llm-wiki-qmd.md"), "utf8")).toContain("qmd search --json");
+  });
+
+  it("status accepts qmd v1 metadata and reindex migrates it to semantic v2", async () => {
+    const root = await tempRoot("llm-wiki-qmd-v1-migrate-");
+    const fake = await fakeQmdEnv();
+    await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--no-qmd", "--quiet"], fixedEnv());
+    await writeFile(path.join(root, "docs/llm-wiki-qmd.md"), "legacy qmd docs\n", "utf8");
+    const manifestPath = path.join(root, ".llm-wiki-skills.json");
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+    manifest.integrations = {
+      ...(manifest.integrations ?? {}),
+      qmd: {
+        enabled: true,
+        schemaVersion: 1,
+        collection: "legacy",
+        root,
+        docsPath: "docs/llm-wiki-qmd.md",
+        searchMode: "keyword",
+        lastIndexedAt: "2026-06-01T00:00:00.000Z"
+      }
+    };
+    manifest.files.push("docs/llm-wiki-qmd.md");
+    manifest.files.sort();
+    await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+
+    const status = await execaNode(["dist/cli/index.js", "status", "--root", root, "--json"], fixedEnv());
+    expect(JSON.parse(status.stdout).integrations.qmd).toMatchObject({ schemaVersion: 1, searchMode: "keyword" });
+
+    await execaNode(["dist/cli/index.js", "qmd", "reindex", "--root", root, "--json"], fixedEnv(undefined, fake.env));
+
+    const migrated = JSON.parse(await readFile(manifestPath, "utf8"));
+    expect(migrated.integrations.qmd).toMatchObject({ schemaVersion: 2, collection: "legacy", searchMode: "hybrid", runtimeMode: "gpu-auto" });
+    expect(migrated.integrations.qmd.lastEmbeddedAt).toBe("2026-06-10T00:00:00.000Z");
+    expect(await readFile(path.join(root, "docs/llm-wiki-qmd.md"), "utf8")).toContain("qmd query --json");
+  });
+
+  it("status rejects inconsistent qmd v2 semantic metadata", async () => {
+    const root = await tempRoot("llm-wiki-qmd-invalid-v2-");
+    const fake = await fakeQmdEnv();
+    await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--qmd", "--quiet"], fixedEnv(undefined, fake.env));
+    const manifestPath = path.join(root, ".llm-wiki-skills.json");
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+    manifest.integrations.qmd.searchMode = "keyword";
+    manifest.integrations.qmd.runtimeMode = "gpu-auto";
+    await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+
+    const invalid = await execaNode(["dist/cli/index.js", "status", "--root", root], fixedEnv(), false);
+
+    expect(invalid.exitCode).toBe(13);
+    expect(invalid.stderr).toContain("inconsistent qmd semantic metadata");
+
+    manifest.integrations.qmd.searchMode = "hybrid";
+    manifest.integrations.qmd.runtimeMode = "gpu-auto";
+    manifest.integrations.qmd.models = manifest.integrations.qmd.models.slice(0, 1);
+    await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+
+    const invalidModels = await execaNode(["dist/cli/index.js", "status", "--root", root], fixedEnv(), false);
+    expect(invalidModels.exitCode).toBe(13);
+    expect(invalidModels.stderr).toContain("unsupported qmd model metadata");
+  });
+
+  it("generated query skills choose qmd commands from manifest state", async () => {
+    const root = await tempRoot("llm-wiki-qmd-generated-skills-");
+    await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex,claude-code", "--quiet"], fixedEnv());
+
+    const codex = await readFile(path.join(root, ".agents/skills/llm-wiki-query/SKILL.md"), "utf8");
+    const claude = await readFile(path.join(root, ".claude/skills/llm-wiki-query/SKILL.md"), "utf8");
+    for (const content of [codex, claude]) {
+      expect(content).toContain('searchMode: "hybrid"');
+      expect(content).toContain("qmd query --json");
+      expect(content).toContain("QMD_FORCE_CPU=1 qmd query --json");
+      expect(content).toContain("qmd search --json");
+      expect(content).toContain("markdown remains the source of truth");
+    }
   });
 
   it("unknown host returns InvalidHostError", async () => {
@@ -642,6 +782,19 @@ printf "qmd %s\\n" "$*" >> "$QMD_LOG"
 if [ "$QMD_FAIL" = "$1" ]; then
   echo "forced qmd failure" >&2
   exit 2
+fi
+if [ "$1" = "embed" ]; then
+  if [ "$QMD_EMBED_GPU_FAIL" = "1" ] && [ -z "$QMD_FORCE_CPU" ]; then
+    echo "CUDA backend failed" >&2
+    exit 2
+  fi
+  if [ -f "wiki/index.md" ]; then
+    echo "embed-wiki exists" >> "$QMD_LOG"
+  else
+    echo "embed-wiki missing" >> "$QMD_LOG"
+  fi
+  printf "embed-cpu %s\\n" "$QMD_FORCE_CPU" >> "$QMD_LOG"
+  echo "embedding progress"
 fi
 if [ "$1 $2" = "collection add" ]; then
   if [ "$4" != "--name" ] || [ -z "$5" ]; then

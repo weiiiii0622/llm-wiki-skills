@@ -4,7 +4,7 @@ import { ManifestMismatchError, RequiredFileMissingError } from "./errors.js";
 import { atomicWriteText, pathExists, stableJson } from "./fs.js";
 import { getHostAdapters } from "./hosts.js";
 import { obsidianGeneratedFilePaths, obsidianIntegrationMetadata } from "./obsidian.js";
-import { qmdGeneratedFilePaths } from "./qmd-metadata.js";
+import { QMD_MODEL_CACHE_PATH, QMD_MODELS, qmdGeneratedFilePaths } from "./qmd-metadata.js";
 import { isTopicSelectionId, isTopicTemplateId } from "./topic-templates.js";
 import { REQUIRED_DIRECTORIES, sharedReferenceFilePaths, starterFilePaths } from "./vault-contract.js";
 import type { HostId, Manifest, ManifestIntegrations, ManifestTopicMetadata, StatusReport } from "./types.js";
@@ -202,13 +202,17 @@ function validateQmdIntegration(value: unknown): NonNullable<ManifestIntegration
     throw new ManifestMismatchError(`${MANIFEST_PATH} contains an invalid qmd integration object.`);
   }
   const qmd = value as Record<string, unknown>;
+  if (qmd.schemaVersion === 1) return validateQmdIntegrationV1(qmd);
+  if (qmd.schemaVersion === 2) return validateQmdIntegrationV2(qmd);
+  throw new ManifestMismatchError(`${MANIFEST_PATH} contains unsupported qmd integration metadata.`);
+}
+
+function validateQmdIntegrationBase(qmd: Record<string, unknown>): void {
   if (
     qmd.enabled !== true ||
-    qmd.schemaVersion !== 1 ||
     typeof qmd.collection !== "string" ||
     typeof qmd.root !== "string" ||
-    typeof qmd.docsPath !== "string" ||
-    qmd.searchMode !== "keyword"
+    typeof qmd.docsPath !== "string"
   ) {
     throw new ManifestMismatchError(`${MANIFEST_PATH} contains unsupported qmd integration metadata.`);
   }
@@ -218,13 +222,72 @@ function validateQmdIntegration(value: unknown): NonNullable<ManifestIntegration
   if (qmd.lastIndexedAt !== undefined && typeof qmd.lastIndexedAt !== "string") {
     throw new ManifestMismatchError(`${MANIFEST_PATH} contains invalid qmd last indexed timestamp.`);
   }
+}
+
+function validateQmdIntegrationV1(qmd: Record<string, unknown>): NonNullable<ManifestIntegrations["qmd"]> {
+  validateQmdIntegrationBase(qmd);
+  if (qmd.searchMode !== "keyword") {
+    throw new ManifestMismatchError(`${MANIFEST_PATH} contains unsupported qmd integration metadata.`);
+  }
   return {
     enabled: true,
     schemaVersion: 1,
-    collection: qmd.collection,
-    root: qmd.root,
-    docsPath: qmd.docsPath,
+    collection: qmd.collection as string,
+    root: qmd.root as string,
+    docsPath: qmd.docsPath as string,
     searchMode: "keyword",
     ...(typeof qmd.lastIndexedAt === "string" ? { lastIndexedAt: qmd.lastIndexedAt } : {})
   };
+}
+
+function validateQmdIntegrationV2(qmd: Record<string, unknown>): NonNullable<ManifestIntegrations["qmd"]> {
+  validateQmdIntegrationBase(qmd);
+  if (
+    (qmd.searchMode !== "hybrid" && qmd.searchMode !== "keyword") ||
+    (qmd.runtimeMode !== "gpu-auto" && qmd.runtimeMode !== "cpu-forced" && qmd.runtimeMode !== "keyword-fallback") ||
+    !Array.isArray(qmd.models) ||
+    qmd.modelCachePath !== QMD_MODEL_CACHE_PATH
+  ) {
+    throw new ManifestMismatchError(`${MANIFEST_PATH} contains unsupported qmd integration metadata.`);
+  }
+  if (qmd.searchMode === "keyword" && qmd.runtimeMode !== "keyword-fallback") {
+    throw new ManifestMismatchError(`${MANIFEST_PATH} contains inconsistent qmd semantic metadata.`);
+  }
+  if (qmd.searchMode === "hybrid" && qmd.runtimeMode === "keyword-fallback") {
+    throw new ManifestMismatchError(`${MANIFEST_PATH} contains inconsistent qmd semantic metadata.`);
+  }
+  if (!hasExpectedQmdModels(qmd.models)) {
+    throw new ManifestMismatchError(`${MANIFEST_PATH} contains unsupported qmd model metadata.`);
+  }
+  if (qmd.lastEmbeddedAt !== undefined && typeof qmd.lastEmbeddedAt !== "string") {
+    throw new ManifestMismatchError(`${MANIFEST_PATH} contains invalid qmd last embedded timestamp.`);
+  }
+  if (qmd.fallbackReason !== undefined && typeof qmd.fallbackReason !== "string") {
+    throw new ManifestMismatchError(`${MANIFEST_PATH} contains invalid qmd fallback reason.`);
+  }
+  return {
+    enabled: true,
+    schemaVersion: 2,
+    collection: qmd.collection as string,
+    root: qmd.root as string,
+    docsPath: qmd.docsPath as string,
+    searchMode: qmd.searchMode,
+    runtimeMode: qmd.runtimeMode,
+    models: QMD_MODELS,
+    modelCachePath: QMD_MODEL_CACHE_PATH,
+    ...(typeof qmd.lastIndexedAt === "string" ? { lastIndexedAt: qmd.lastIndexedAt } : {}),
+    ...(typeof qmd.lastEmbeddedAt === "string" ? { lastEmbeddedAt: qmd.lastEmbeddedAt } : {}),
+    ...(typeof qmd.fallbackReason === "string" ? { fallbackReason: qmd.fallbackReason } : {})
+  };
+}
+
+function hasExpectedQmdModels(values: unknown[]): boolean {
+  if (values.length !== QMD_MODELS.length) return false;
+  return QMD_MODELS.every((expected) =>
+    values.some((value) => {
+      if (!value || typeof value !== "object") return false;
+      const model = value as Record<string, unknown>;
+      return model.name === expected.name && model.purpose === expected.purpose && model.size === expected.size;
+    })
+  );
 }
