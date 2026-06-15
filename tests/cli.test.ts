@@ -82,19 +82,19 @@ describe("cli", () => {
 
   it("init --topic writes topic metadata, directories, and routing guide", async () => {
     const root = await tempRoot("llm-wiki-topic-");
-    const result = await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--topic", "finance", "--json"], fixedEnv());
+    const result = await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--topic", "investment", "--json"], fixedEnv());
 
     const output = JSON.parse(result.stdout);
-    expect(output.topic).toMatchObject({ id: "finance", scaffoldId: "finance", label: "Finance" });
-    expect(output.files["wiki/accounts/"]).toBe("created");
+    expect(output.topic).toMatchObject({ id: "investment", scaffoldId: "investment", label: "Investment" });
+    expect(output.files["wiki/companies/"]).toBe("created");
     expect(output.files["docs/llm-wiki-routing.md"]).toBe("created");
-    expect((await stat(path.join(root, "wiki/accounts"))).isDirectory()).toBe(true);
-    await expect(readFile(path.join(root, "docs/llm-wiki-routing.md"), "utf8")).resolves.toContain("`wiki/accounts/`: Bank");
+    expect((await stat(path.join(root, "wiki/companies"))).isDirectory()).toBe(true);
+    await expect(readFile(path.join(root, "docs/llm-wiki-routing.md"), "utf8")).resolves.toContain("`wiki/companies/`: Company");
 
     const manifest = JSON.parse(await readFile(path.join(root, ".llm-wiki-skills.json"), "utf8"));
-    expect(manifest.topic).toMatchObject({ id: "finance", scaffoldId: "finance" });
+    expect(manifest.topic).toMatchObject({ id: "investment", scaffoldId: "investment" });
     expect(manifest.files).not.toContain("docs/llm-wiki-routing.md");
-    expect(manifest.directories).not.toContain("wiki/accounts");
+    expect(manifest.directories).not.toContain("wiki/companies");
   });
 
   it("--template is an alias for --topic and matching duplicate values are allowed", async () => {
@@ -127,13 +127,23 @@ describe("cli", () => {
   it("conflicting --topic and --template values fail", async () => {
     const root = await tempRoot("llm-wiki-topic-conflict-");
     const result = await execaNode(
-      ["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--topic", "finance", "--template", "trip-plan"],
+      ["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--topic", "investment", "--template", "trip-plan"],
       fixedEnv(),
       false
     );
 
     expect(result.exitCode).toBe(15);
-    expect(result.stderr).toContain("Conflicting topic values: finance, trip-plan");
+    expect(result.stderr).toContain("Conflicting topic values: investment, trip-plan");
+    expectProjectErrorCodeHidden(result.stderr);
+  });
+
+  it("rejects the removed finance topic", async () => {
+    const root = await tempRoot("llm-wiki-removed-finance-topic-");
+    const result = await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--topic", "finance"], fixedEnv(), false);
+
+    expect(result.exitCode).toBe(14);
+    expect(result.stderr).toContain("Unknown topic: finance.");
+    expect(result.stderr).toContain("investment");
     expectProjectErrorCodeHidden(result.stderr);
   });
 
@@ -658,12 +668,12 @@ describe("cli", () => {
 
   it("status passes after deleting optional topic scaffold pages", async () => {
     const root = await tempRoot("llm-wiki-status-optional-topic-");
-    await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--topic", "finance", "--quiet"], fixedEnv());
-    await rm(path.join(root, "wiki/accounts"), { recursive: true });
+    await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--topic", "investment", "--quiet"], fixedEnv());
+    await rm(path.join(root, "wiki/companies"), { recursive: true });
     await rm(path.join(root, "docs/llm-wiki-routing.md"));
 
     const status = await execaNode(["dist/cli/index.js", "status", "--root", root, "--json"], fixedEnv());
-    expect(JSON.parse(status.stdout)).toMatchObject({ status: "pass", topic: { id: "finance", scaffoldId: "finance" } });
+    expect(JSON.parse(status.stdout)).toMatchObject({ status: "pass", topic: { id: "investment", scaffoldId: "investment" } });
   });
 
   it("status fails for missing manifest", async () => {
@@ -745,19 +755,19 @@ describe("cli", () => {
 
   it("rerun init skips edited topic scaffold files and adds missing optional scaffold pages", async () => {
     const root = await tempRoot("llm-wiki-topic-rerun-");
-    await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--topic", "finance", "--quiet"], fixedEnv());
-    await writeFile(path.join(root, "docs/llm-wiki-routing.md"), "custom finance\n", "utf8");
+    await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--topic", "investment", "--quiet"], fixedEnv());
+    await writeFile(path.join(root, "docs/llm-wiki-routing.md"), "custom investment\n", "utf8");
 
-    const firstRerun = await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--topic", "finance", "--json"], fixedEnv());
+    const firstRerun = await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--topic", "investment", "--json"], fixedEnv());
     expect(JSON.parse(firstRerun.stdout).files["docs/llm-wiki-routing.md"]).toBe("skipped");
-    expect(JSON.parse(firstRerun.stdout).files["wiki/accounts/"]).toBe("skipped");
-    await expect(readFile(path.join(root, "docs/llm-wiki-routing.md"), "utf8")).resolves.toBe("custom finance\n");
+    expect(JSON.parse(firstRerun.stdout).files["wiki/companies/"]).toBe("skipped");
+    await expect(readFile(path.join(root, "docs/llm-wiki-routing.md"), "utf8")).resolves.toBe("custom investment\n");
 
     await rm(path.join(root, "docs/llm-wiki-routing.md"));
-    await rm(path.join(root, "wiki/accounts"), { recursive: true });
-    const secondRerun = await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--topic", "finance", "--json"], fixedEnv());
+    await rm(path.join(root, "wiki/companies"), { recursive: true });
+    const secondRerun = await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--topic", "investment", "--json"], fixedEnv());
     expect(JSON.parse(secondRerun.stdout).files["docs/llm-wiki-routing.md"]).toBe("created");
-    expect(JSON.parse(secondRerun.stdout).files["wiki/accounts/"]).toBe("created");
+    expect(JSON.parse(secondRerun.stdout).files["wiki/companies/"]).toBe("created");
     await expect(readFile(path.join(root, "docs/llm-wiki-routing.md"), "utf8")).resolves.toContain("# LLM Wiki Routing");
   });
 });

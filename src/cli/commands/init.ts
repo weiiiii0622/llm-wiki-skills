@@ -99,7 +99,7 @@ function validateCustomTopic(value: string | undefined): string {
 }
 
 function supportedTopics(): string {
-  return "general, study-research, work-project, product-builder, writing-content, trip-plan, finance, home-life, medical, legal-admin, custom";
+  return "general, study-research, work-project, product-builder, writing-content, trip-plan, investment, home-life, medical, legal-admin, custom";
 }
 
 function buildCustomTopicHandoffPrompt(topic: ResolvedTopicSelection): string | undefined {

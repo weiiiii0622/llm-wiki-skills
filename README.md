@@ -163,17 +163,18 @@ Creates these directories:
 
 ```text
 wiki/
-|-- literature/
-|-- notes/
 |-- concepts/
+|-- papers/
+|-- authors/
 |-- methods/
 |-- datasets/
-|-- questions/
-|-- sources/
-`-- outputs/
+|-- experiments/
+|-- comparisons/
+|-- claims-and-evidence/
+`-- templates/
 ```
 
-- examples: paper reviews, course notes, research questions
+- examples: literature notes, research questions, datasets
 
 ### `work-project`
 
@@ -183,13 +184,19 @@ Creates these directories:
 
 ```text
 wiki/
+|-- architecture/
+|-- features/
+|-- services/
 |-- projects/
 |-- decisions/
 |-- meetings/
-|-- stakeholders/
-|-- risks/
 |-- requirements/
-`-- sources/
+|-- stakeholders/
+|-- milestones/
+|-- incidents/
+|-- risks/
+|-- retrospectives/
+`-- templates/
 ```
 
 - examples: decision logs, meeting notes, project references
@@ -202,15 +209,17 @@ Creates these directories:
 
 ```text
 wiki/
-|-- users/
-|-- feedback/
+|-- personas/
 |-- problems/
-|-- solutions/
-|-- experiments/
+|-- use-cases/
+|-- features/
+|-- user-journeys/
 |-- competitors/
-|-- decisions/
+|-- pricing/
 |-- metrics/
-`-- sources/
+|-- growth/
+|-- experiments/
+`-- templates/
 ```
 
 - examples: customer interviews, experiment notes, competitor research
@@ -223,14 +232,13 @@ Creates these directories:
 
 ```text
 wiki/
-|-- ideas/
-|-- research/
-|-- claims/
+|-- audience/
+|-- topics/
+|-- series/
+|-- claims-and-sources/
+|-- examples/
 |-- outlines/
-|-- drafts/
-|-- revisions/
-|-- references/
-`-- published/
+`-- templates/
 ```
 
 - examples: essay outlines, draft research, published pieces
@@ -243,40 +251,41 @@ Creates these directories:
 
 ```text
 wiki/
-|-- itinerary/
-|-- places/
+|-- destinations/
+|-- cities/
+|-- attractions/
+|-- restaurants/
+|-- hotels/
 |-- transport/
-|-- lodging/
-|-- bookings/
 |-- budget/
-|-- packing/
-`-- sources/
+|-- itinerary/
+`-- templates/
 ```
 
 - examples: itineraries, booking references, destination notes
 
-### `finance`
+### `investment`
 
-Use this for budgets, tax references, investment research, assumptions, and review items. It keeps financial notes source-grounded and does not replace professional advice.
+Use this for investment policy, watchlists, portfolio notes, company research, theses, valuation, risks, catalysts, and decision reviews. It keeps investment notes source-grounded and does not replace professional advice.
 
 Creates these directories:
 
 ```text
 wiki/
-|-- accounts/
-|-- budget/
-|-- cashflow/
-|-- debts/
-|-- investments/
-|-- insurance/
-|-- taxes/
-|-- goals/
-|-- policies/
-|-- questions/
-`-- sources/
+|-- portfolio/
+|-- companies/
+|-- industries/
+|-- theses/
+|-- valuation/
+|-- risks/
+|-- catalysts/
+|-- competitors/
+|-- macro/
+|-- postmortems/
+`-- templates/
 ```
 
-- examples: budget notes, tax references, investment research
+- examples: company notes, valuation notes, investment research
 
 ### `home-life`
 
@@ -286,16 +295,16 @@ Creates these directories:
 
 ```text
 wiki/
-|-- household/
-|-- maintenance/
-|-- vendors/
-|-- inventory/
-|-- purchases/
-|-- warranties/
-|-- records/
 |-- routines/
-|-- emergency/
-`-- sources/
+|-- appliances/
+|-- maintenance/
+|-- repairs/
+|-- purchases/
+|-- subscriptions/
+|-- utilities/
+|-- inventory/
+|-- documents/
+`-- templates/
 ```
 
 - examples: home projects, important records, recurring routines
@@ -331,19 +340,18 @@ Creates these directories:
 
 ```text
 wiki/
-|-- matters/
-|-- documents/
+|-- legal-matters/
 |-- contracts/
-|-- parties/
-|-- evidence/
+|-- obligations/
 |-- deadlines/
-|-- correspondence/
-|-- filings/
-|-- questions/
-`-- sources/
+|-- applications/
+|-- agencies/
+|-- contacts/
+|-- decision-records/
+`-- templates/
 ```
 
-- examples: contracts, evidence files, deadline checklists
+- examples: contracts, applications, deadline checklists
 
 ### `custom`
 

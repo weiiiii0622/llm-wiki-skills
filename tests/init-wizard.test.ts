@@ -95,7 +95,7 @@ describe("topic templates", () => {
       const template = getTopicTemplate(id);
       expect(template.directories.length).toBeGreaterThan(0);
       for (const directory of template.directories) {
-        expect(directory.relativePath).toMatch(/^wiki\/[a-z0-9/-]+$/);
+        expect(directory.relativePath).toMatch(/^wiki\/[A-Za-z0-9/-]+$/);
         expect(directory.relativePath).not.toContain("..");
         expect(directory.purpose).toBeTruthy();
       }
@@ -115,6 +115,37 @@ describe("topic templates", () => {
     expect(readme).toContain("### `custom`");
     expect(readme).toContain("--topic custom --custom-topic");
     expect(readme).toContain("The CLI does not call a hosted LLM");
+  });
+
+  it("keeps requested work-project and medical directory structures", () => {
+    expect(getTopicTemplate("work-project").directories.map((directory) => directory.relativePath)).toEqual([
+      "wiki/architecture",
+      "wiki/features",
+      "wiki/services",
+      "wiki/projects",
+      "wiki/decisions",
+      "wiki/meetings",
+      "wiki/requirements",
+      "wiki/stakeholders",
+      "wiki/milestones",
+      "wiki/incidents",
+      "wiki/risks",
+      "wiki/retrospectives",
+      "wiki/templates"
+    ]);
+    expect(getTopicTemplate("medical").directories.map((directory) => directory.relativePath)).toEqual([
+      "wiki/anatomy",
+      "wiki/physiology",
+      "wiki/conditions",
+      "wiki/diagnostics",
+      "wiki/drugs",
+      "wiki/procedures",
+      "wiki/guidelines",
+      "wiki/cases",
+      "wiki/questions",
+      "wiki/sources",
+      "wiki/templates"
+    ]);
   });
 });
 
@@ -390,7 +421,7 @@ describe("init wizard", () => {
   });
 
   it("uses a fixed topic when command-line topic options were already provided", async () => {
-    const { runtime, write } = scriptedRuntime({ hosts: ["codex"], topic: "finance", confirm: true });
+    const { runtime, write } = scriptedRuntime({ hosts: ["codex"], topic: "investment", confirm: true });
 
     const plan = await runInitWizard("/tmp/wiki", runtime, {
       id: "trip-plan",
@@ -400,7 +431,7 @@ describe("init wizard", () => {
 
     expect(plan.topic.id).toBe("trip-plan");
     expect(write.mock.calls.join("\n")).toContain("Trip plan");
-    expect(write.mock.calls.join("\n")).not.toContain("Finance");
+    expect(write.mock.calls.join("\n")).not.toContain("Investment");
   });
 
   it("cancels before writing when host selection is canceled", async () => {

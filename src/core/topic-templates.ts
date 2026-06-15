@@ -7,7 +7,7 @@ export const TOPIC_TEMPLATE_IDS = [
   "product-builder",
   "writing-content",
   "trip-plan",
-  "finance",
+  "investment",
   "home-life",
   "medical",
   "legal-admin"
@@ -57,103 +57,112 @@ export const TOPIC_TEMPLATES: Record<TopicTemplateId, TopicTemplate> = {
     "research questions",
     "datasets"
   ], [
-    ["wiki/literature", "Paper, book, article, and lecture notes."],
-    ["wiki/notes", "Atomic research notes and reusable observations."],
     ["wiki/concepts", "Definitions, theories, mechanisms, and models."],
+    ["wiki/papers", "Paper summaries, findings, citations, and evidence notes."],
+    ["wiki/authors", "Researcher, institution, and author context."],
     ["wiki/methods", "Methods, protocols, analytical techniques, and study designs."],
     ["wiki/datasets", "Datasets, measurements, cohorts, and data dictionaries."],
-    ["wiki/questions", "Research questions, hypotheses, and unresolved gaps."],
-    ["wiki/sources", "Source summaries and evidence notes."],
-    ["wiki/outputs", "Draft papers, reports, presentations, and study products."]
+    ["wiki/experiments", "Experiment notes, setups, results, and reproducibility details."],
+    ["wiki/comparisons", "Comparisons between papers, methods, models, and findings."],
+    ["wiki/claims-and-evidence", "Claims mapped to supporting and conflicting evidence."],
+    ["wiki/templates", "Reusable study and research page templates."]
   ]),
   "work-project": topicTemplate("work-project", "Work project", "Keep project work organized around outcomes, decisions, meetings, people, risks, and requirements.", [
     "decision logs",
     "meeting notes",
     "delivery risks"
   ], [
-    ["wiki/projects", "Project briefs, milestones, plans, and current state."],
+    ["wiki/architecture", "System design, diagrams, components, and technical context."],
+    ["wiki/features", "Feature specs, user flows, requirements, and implementation notes."],
+    ["wiki/services", "Service ownership, behavior, dependencies, and runbooks."],
+    ["wiki/projects", "Project briefs, plans, current state, and delivery context."],
     ["wiki/decisions", "Decision records, tradeoffs, approvals, and reversals."],
     ["wiki/meetings", "Meeting notes, agendas, action items, and follow-ups."],
-    ["wiki/stakeholders", "People, teams, ownership, and communication context."],
-    ["wiki/risks", "Risks, blockers, mitigations, and open dependencies."],
     ["wiki/requirements", "Requirements, constraints, acceptance criteria, and specs."],
-    ["wiki/sources", "Source summaries and evidence notes."]
+    ["wiki/stakeholders", "People, teams, ownership, and communication context."],
+    ["wiki/milestones", "Milestones, delivery checkpoints, and launch plans."],
+    ["wiki/incidents", "Incident reports, impact, causes, and remediation."],
+    ["wiki/risks", "Risks, blockers, mitigations, and open dependencies."],
+    ["wiki/retrospectives", "Retrospectives, lessons learned, and process changes."],
+    ["wiki/templates", "Reusable work project page templates."]
   ]),
   "product-builder": topicTemplate("product-builder", "Product builder", "Connect users, feedback, problems, experiments, competitors, decisions, and metrics.", [
     "customer interviews",
     "experiment notes",
     "competitor research"
   ], [
-    ["wiki/users", "Segments, personas, interviews, jobs, and user context."],
-    ["wiki/feedback", "Feedback, support themes, sales notes, and user quotes."],
+    ["wiki/personas", "Segments, personas, interviews, jobs, and user context."],
     ["wiki/problems", "Problem statements, pain points, demand signals, and status quo."],
-    ["wiki/solutions", "Feature ideas, prototypes, product bets, and solution sketches."],
-    ["wiki/experiments", "Tests, hypotheses, results, and learning loops."],
+    ["wiki/use-cases", "Use cases, workflows, jobs, and user scenarios."],
+    ["wiki/features", "Feature ideas, prototypes, product bets, and solution sketches."],
+    ["wiki/user-journeys", "User journeys, funnels, touchpoints, and experience maps."],
     ["wiki/competitors", "Alternatives, competitors, positioning, and market notes."],
-    ["wiki/decisions", "Product decisions, tradeoffs, and roadmap rationale."],
+    ["wiki/pricing", "Pricing research, packaging, willingness to pay, and monetization."],
     ["wiki/metrics", "Activation, retention, revenue, usage, and quality metrics."],
-    ["wiki/sources", "Source summaries and evidence notes."]
+    ["wiki/growth", "Growth channels, loops, experiments, and distribution ideas."],
+    ["wiki/experiments", "Tests, hypotheses, results, and learning loops."],
+    ["wiki/templates", "Reusable product builder page templates."]
   ]),
   "writing-content": topicTemplate("writing-content", "Writing and content", "Move from ideas and research to claims, outlines, drafts, revisions, references, and published work.", [
     "essay outlines",
     "draft research",
     "published pieces"
   ], [
-    ["wiki/ideas", "Raw ideas, angles, prompts, and topic seeds."],
-    ["wiki/research", "Background research and source-backed notes."],
-    ["wiki/claims", "Claims, arguments, evidence, and counterpoints."],
+    ["wiki/audience", "Audience profiles, reader needs, objections, and vocabulary."],
+    ["wiki/topics", "Topic clusters, angles, prompts, and content seeds."],
+    ["wiki/series", "Series plans, recurring formats, and connected content arcs."],
+    ["wiki/claims-and-sources", "Claims, arguments, evidence, and source mappings."],
+    ["wiki/examples", "Reusable examples, anecdotes, snippets, and references."],
     ["wiki/outlines", "Structures, briefs, storyboards, and article plans."],
-    ["wiki/drafts", "Active drafts and works in progress."],
-    ["wiki/revisions", "Revision notes, edits, feedback, and version history."],
-    ["wiki/references", "Reusable references, citations, examples, and quotes."],
-    ["wiki/published", "Published pieces, final assets, and distribution notes."]
+    ["wiki/templates", "Reusable writing and content page templates."]
   ]),
   "trip-plan": topicTemplate("trip-plan", "Trip plan", "Collect itinerary, places, transport, lodging, bookings, budget, packing, and travel sources.", [
     "itineraries",
     "booking references",
     "destination notes"
   ], [
-    ["wiki/itinerary", "Day plans, schedules, constraints, and trip timeline."],
-    ["wiki/places", "Destinations, attractions, restaurants, and local notes."],
+    ["wiki/destinations", "Destination overviews, constraints, and decision context."],
+    ["wiki/cities", "City notes, neighborhoods, logistics, and local context."],
+    ["wiki/attractions", "Attractions, activities, hours, costs, and visit notes."],
+    ["wiki/restaurants", "Restaurants, food options, reservations, and reviews."],
+    ["wiki/hotels", "Hotels, rentals, neighborhoods, and stay options."],
     ["wiki/transport", "Flights, trains, local transit, car rentals, and routes."],
-    ["wiki/lodging", "Hotels, rentals, neighborhoods, and stay options."],
-    ["wiki/bookings", "Reservations, confirmations, tickets, and cancellation details."],
     ["wiki/budget", "Costs, currency notes, tradeoffs, and spending plans."],
-    ["wiki/packing", "Packing lists, gear, documents, and preparation notes."],
-    ["wiki/sources", "Source summaries and evidence notes."]
+    ["wiki/itinerary", "Day plans, schedules, constraints, and trip timeline."],
+    ["wiki/templates", "Reusable trip planning page templates."]
   ]),
-  finance: topicTemplate("finance", "Finance", "Track accounts, cashflow, debts, investments, insurance, taxes, goals, policies, and questions.", [
-    "budget notes",
-    "tax references",
+  investment: topicTemplate("investment", "Investment", "Track policy, watchlists, portfolio, companies, theses, valuation, risks, catalysts, macro, and decisions.", [
+    "company notes",
+    "valuation notes",
     "investment research"
   ], [
-    ["wiki/accounts", "Bank, brokerage, card, loan, and service account context."],
-    ["wiki/budget", "Budget plans, categories, limits, and periodic reviews."],
-    ["wiki/cashflow", "Income, expenses, recurring payments, and liquidity notes."],
-    ["wiki/debts", "Debt balances, payoff plans, terms, and refinancing notes."],
-    ["wiki/investments", "Investment research, allocations, watchlists, and assumptions."],
-    ["wiki/insurance", "Insurance policies, coverage, claims, and protection gaps."],
-    ["wiki/taxes", "Tax documents, deadlines, references, and filing questions."],
-    ["wiki/goals", "Financial goals, plans, milestones, and decision criteria."],
-    ["wiki/policies", "Personal finance rules, constraints, checklists, and playbooks."],
-    ["wiki/questions", "Open questions for research or professional review."],
-    ["wiki/sources", "Source summaries and evidence notes."]
+    ["wiki/portfolio", "Portfolio holdings, allocation, exposure, and review notes."],
+    ["wiki/companies", "Company pages, business models, filings, and operating context."],
+    ["wiki/industries", "Industry structure, market maps, and sector trends."],
+    ["wiki/theses", "Investment theses, assumptions, evidence, and counterarguments."],
+    ["wiki/valuation", "Valuation models, multiples, assumptions, and scenarios."],
+    ["wiki/risks", "Business, financial, market, execution, and thesis risks."],
+    ["wiki/catalysts", "Catalysts, events, timelines, and monitoring notes."],
+    ["wiki/competitors", "Competitor pages, comparisons, and positioning."],
+    ["wiki/macro", "Macro context, rates, currencies, cycles, and policy notes."],
+    ["wiki/postmortems", "Decision reviews, postmortems, and lessons learned."],
+    ["wiki/templates", "Reusable investment page templates."]
   ]),
   "home-life": topicTemplate("home-life", "Home and life", "Maintain household systems, maintenance, vendors, inventory, purchases, warranties, records, routines, and emergency info.", [
     "home maintenance",
     "important records",
     "recurring routines"
   ], [
-    ["wiki/household", "Household overview, rooms, systems, family context, and admin."],
-    ["wiki/maintenance", "Maintenance logs, schedules, issues, repairs, and projects."],
-    ["wiki/vendors", "Contractors, services, providers, and contact history."],
-    ["wiki/inventory", "Important belongings, appliances, serial numbers, and assets."],
-    ["wiki/purchases", "Purchase research, receipts, orders, and replacement decisions."],
-    ["wiki/warranties", "Warranties, manuals, service plans, and claim details."],
-    ["wiki/records", "Important records, IDs, forms, and long-lived documents."],
     ["wiki/routines", "Recurring routines, checklists, chores, and household operations."],
-    ["wiki/emergency", "Emergency contacts, instructions, shutoffs, and contingency notes."],
-    ["wiki/sources", "Source summaries and evidence notes."]
+    ["wiki/appliances", "Appliances, manuals, serial numbers, maintenance, and issues."],
+    ["wiki/maintenance", "Maintenance logs, schedules, issues, repairs, and projects."],
+    ["wiki/repairs", "Repair notes, vendors, estimates, parts, and outcomes."],
+    ["wiki/purchases", "Purchase research, receipts, orders, and replacement decisions."],
+    ["wiki/subscriptions", "Subscriptions, renewals, plans, and cancellation notes."],
+    ["wiki/utilities", "Utility providers, bills, usage, and account context."],
+    ["wiki/inventory", "Important belongings, appliances, serial numbers, and assets."],
+    ["wiki/documents", "Important records, IDs, forms, and long-lived documents."],
+    ["wiki/templates", "Reusable home and life page templates."]
   ]),
   medical: topicTemplate("medical", "Medical", "Structure medical knowledge around anatomy, physiology, conditions, diagnostics, drugs, procedures, guidelines, cases, questions, and sources.", [
     "clinical references",
@@ -174,19 +183,18 @@ export const TOPIC_TEMPLATES: Record<TopicTemplateId, TopicTemplate> = {
   ]),
   "legal-admin": topicTemplate("legal-admin", "Legal and admin", "Organize matters, documents, contracts, parties, evidence, deadlines, correspondence, filings, questions, and sources.", [
     "contracts",
-    "evidence files",
+    "applications",
     "deadline checklists"
   ], [
-    ["wiki/matters", "Cases, administrative matters, projects, and issue overviews."],
-    ["wiki/documents", "Important documents, forms, IDs, certificates, and records."],
+    ["wiki/legal-matters", "Legal matters, issues, facts, status, and next actions."],
     ["wiki/contracts", "Contracts, agreements, terms, obligations, and amendments."],
-    ["wiki/parties", "People, organizations, roles, counsel, agencies, and contacts."],
-    ["wiki/evidence", "Evidence, exhibits, facts, artifacts, and source-backed claims."],
+    ["wiki/obligations", "Obligations, responsibilities, compliance needs, and renewals."],
     ["wiki/deadlines", "Deadlines, renewals, statutes, filing dates, and reminders."],
-    ["wiki/correspondence", "Emails, letters, notices, calls, and communication history."],
-    ["wiki/filings", "Filed forms, submissions, receipts, and official responses."],
-    ["wiki/questions", "Open questions for research or professional review."],
-    ["wiki/sources", "Source summaries and evidence notes."]
+    ["wiki/applications", "Applications, submissions, requirements, and status notes."],
+    ["wiki/agencies", "Government agencies, offices, portals, and procedures."],
+    ["wiki/contacts", "Contacts, counsel, agencies, organizations, and communication context."],
+    ["wiki/decision-records", "Decision records, tradeoffs, approvals, and reversals."],
+    ["wiki/templates", "Reusable legal and admin page templates."]
   ])
 };
 

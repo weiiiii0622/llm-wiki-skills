@@ -175,7 +175,7 @@ Hosts:
 
 Topics:
   general, study-research, work-project, product-builder, writing-content,
-  trip-plan, finance, home-life, medical, legal-admin, custom
+  trip-plan, investment, home-life, medical, legal-admin, custom
 
 First run:
   npx llm-wiki-skills init

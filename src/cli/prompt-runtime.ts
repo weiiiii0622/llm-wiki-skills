@@ -393,7 +393,7 @@ function isTopicSelection(value: unknown): value is TopicSelectionId {
     value === "product-builder" ||
     value === "writing-content" ||
     value === "trip-plan" ||
-    value === "finance" ||
+    value === "investment" ||
     value === "home-life" ||
     value === "medical" ||
     value === "legal-admin" ||
