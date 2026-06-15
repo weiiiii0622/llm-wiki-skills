@@ -1,8 +1,8 @@
-import { chmod, mkdtemp, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ExecFileQmdRunner } from "../src/core/qmd.js";
+import { ExecFileQmdRunner, installQmdPackage, type QmdRunner } from "../src/core/qmd.js";
 
 describe("qmd runner", () => {
   afterEach(() => {
@@ -49,6 +49,52 @@ exit 0
       restoreTTY(process.stdout, stdoutTTY);
       restoreTTY(process.stderr, stderrTTY);
     }
+  });
+
+  it("runs qmd installation from the target wiki root", async () => {
+    const parent = await mkdtemp(path.join(os.tmpdir(), "llm-wiki-qmd-install-root-"));
+    const root = path.join(parent, "wiki-root");
+    const calls: Array<{ command: string; args: string[]; cwd: string }> = [];
+    const runner: QmdRunner = {
+      async run(command, args, cwd) {
+        calls.push({ command, args, cwd });
+        return { stdout: "", stderr: "" };
+      }
+    };
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await installQmdPackage(root, runner);
+
+    expect((await stat(root)).isDirectory()).toBe(true);
+    expect(calls).toEqual([
+      {
+        command: "npm",
+        args: ["install", "-g", "@tobilu/qmd"],
+        cwd: root
+      }
+    ]);
+  });
+
+  it("sets PWD to the target cwd for qmd node subprocesses", async () => {
+    const parent = await mkdtemp(path.join(os.tmpdir(), "llm-wiki-qmd-pwd-"));
+    const root = path.join(parent, "wiki-root");
+    const command = path.join(parent, "fake-qmd");
+    await mkdir(root, { recursive: true });
+    await writeFile(
+      command,
+      `#!/usr/bin/env node
+const fs = require("node:fs");
+const path = require("node:path");
+const pwd = process.env.PWD || process.cwd();
+fs.mkdirSync(path.join(pwd, ".qmd"), { recursive: true });
+`,
+      "utf8"
+    );
+    await chmod(command, 0o755);
+
+    await new ExecFileQmdRunner().run(command, ["init"], root);
+
+    expect((await stat(path.join(root, ".qmd"))).isDirectory()).toBe(true);
   });
 });
 

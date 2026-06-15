@@ -1,4 +1,4 @@
-import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { INIT_CANCELED_MESSAGE } from "../src/core/errors.js";
@@ -314,6 +314,7 @@ describe("cli", () => {
     expect(result.stdout).toContain("◇ qmd");
     expect(result.stdout).toContain("qmd enabled");
     expect(await readFile(fake.log, "utf8")).toContain("npm install -g @tobilu/qmd");
+    expect(await readFile(fake.log, "utf8")).toContain(`npm-cwd ${await realpath(root)}`);
     const manifest = JSON.parse(await readFile(path.join(root, ".llm-wiki-skills.json"), "utf8"));
     expect(manifest.integrations.qmd).toMatchObject({ enabled: true, searchMode: "keyword" });
   });
@@ -336,6 +337,7 @@ describe("cli", () => {
     expect(report).toBeGreaterThan(preview);
     expect(result.stdout).toContain("qmd enabled");
     expect(await readFile(fake.log, "utf8")).toContain("npm install -g @tobilu/qmd");
+    expect(await readFile(fake.log, "utf8")).toContain(`npm-cwd ${await realpath(root)}`);
     const manifest = JSON.parse(await readFile(path.join(root, ".llm-wiki-skills.json"), "utf8"));
     expect(manifest.integrations.qmd).toMatchObject({ enabled: true, searchMode: "keyword" });
   });
@@ -375,6 +377,25 @@ describe("cli", () => {
     expect(manifest.integrations.qmd).toBeUndefined();
   });
 
+  it("qmd enable and reindex show current qmd commands in human output", async () => {
+    const root = await tempRoot("llm-wiki-qmd-command-progress-");
+    const fake = await fakeQmdEnv();
+    await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--no-qmd", "--quiet"], fixedEnv());
+
+    const enabled = await execaNode(["dist/cli/index.js", "qmd", "enable", "--root", root], fixedEnv(undefined, fake.env));
+    expect(enabled.stdout).toContain("Running `qmd --version`...");
+    expect(enabled.stdout).toContain("Running `qmd doctor`...");
+    expect(enabled.stdout).toContain("Running `qmd init`...");
+    expect(enabled.stdout).toContain("Running `qmd collection add");
+    expect(enabled.stdout).toContain(" --name ");
+    expect(enabled.stdout).toContain("Running `qmd update`...");
+    expect(enabled.stdout).toContain("qmd: enabled");
+
+    const reindexed = await execaNode(["dist/cli/index.js", "qmd", "reindex", "--root", root], fixedEnv(undefined, fake.env));
+    expect(reindexed.stdout).toContain("Running `qmd update`...");
+    expect(reindexed.stdout).toContain("qmd: reindexed");
+  });
+
   it("qmd enable prompts to install qmd when missing", async () => {
     const root = await tempRoot("llm-wiki-qmd-enable-install-");
     const fake = await fakeInstallableQmdEnv();
@@ -386,6 +407,7 @@ describe("cli", () => {
     expect(enabled.stdout).toContain("installing qmd fake log");
     expect(enabled.stdout).toContain("qmd: enabled");
     expect(await readFile(fake.log, "utf8")).toContain("npm install -g @tobilu/qmd");
+    expect(await readFile(fake.log, "utf8")).toContain(`npm-cwd ${await realpath(root)}`);
     const manifest = JSON.parse(await readFile(path.join(root, ".llm-wiki-skills.json"), "utf8"));
     expect(manifest.integrations.qmd).toMatchObject({ enabled: true });
   });
@@ -622,7 +644,14 @@ if [ "$QMD_FAIL" = "$1" ]; then
   exit 2
 fi
 if [ "$1 $2" = "collection add" ]; then
-  collection="$3"
+  if [ "$4" != "--name" ] || [ -z "$5" ]; then
+    echo "expected collection add <path> --name <name>" >&2
+    exit 2
+  fi
+  collection_path="$3"
+  collection="$5"
+  printf "collection-path %s\\n" "$collection_path" >> "$QMD_LOG"
+  printf "collection-name %s\\n" "$collection" >> "$QMD_LOG"
   if grep -qx "$collection" "$QMD_COLLECTION_STATE" 2>/dev/null; then
     echo "Collection '$collection' already exists." >&2
     echo "Use a different name with --name <name>" >&2
@@ -651,6 +680,7 @@ async function fakeInstallableQmdEnv(): Promise<{ env: Record<string, string>; l
     path.join(bin, "npm"),
     `#!/bin/sh
 printf "npm %s\\n" "$*" >> "$QMD_LOG"
+printf "npm-cwd %s\\n" "$PWD" >> "$QMD_LOG"
 echo "installing qmd fake log"
 printf '%s\\n' '#!/bin/sh' 'printf "qmd %s\\\\n" "$*" >> "$QMD_LOG"' 'exit 0' > "$QMD_INSTALL_BIN/qmd"
 /bin/chmod +x "$QMD_INSTALL_BIN/qmd"

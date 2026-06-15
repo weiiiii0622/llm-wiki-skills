@@ -10,12 +10,13 @@ export interface PromptedQmdEnableOptions {
   optional: boolean;
   prompt: boolean;
   runtime?: PromptRuntime;
+  showCommands?: boolean;
 }
 
 export async function enableQmdWithInstallPrompt(root: string, options: PromptedQmdEnableOptions): Promise<QmdLifecycleResult> {
   if (options.installApproved === false) return qmdSkipped(root);
   try {
-    return await enableQmd(root, { install: options.installApproved === true, now: options.now });
+    return await enableQmd(root, { install: options.installApproved === true, showCommands: options.showCommands, now: options.now });
   } catch (error) {
     if (!(error instanceof QmdNotInstalledError)) throw error;
     if (options.installApproved === true) throw error;
@@ -26,7 +27,7 @@ export async function enableQmdWithInstallPrompt(root: string, options: Prompted
     const runtime = options.runtime ?? createPromptRuntime();
     const shouldInstall = await runtime.confirm(QMD_INSTALL_PROMPT, false);
     if (!shouldInstall) return qmdSkipped(root);
-    return enableQmd(root, { install: true, now: options.now });
+    return enableQmd(root, { install: true, showCommands: options.showCommands, now: options.now });
   }
 }
 

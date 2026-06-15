@@ -46,9 +46,31 @@ export interface ScriptedPromptAnswers {
   cancel?: "hosts" | "topic" | "text" | "confirm";
 }
 
-type EnquirerConstructor = new () => {
+interface EnquirerInstance {
   prompt<T extends object>(questions: unknown): Promise<T>;
-};
+  register(type: string, prompt: EnquirerPromptConstructor): unknown;
+}
+
+interface EnquirerConstructor {
+  new (): EnquirerInstance;
+  prompts: {
+    Toggle: EnquirerPromptConstructor;
+  };
+}
+
+type EnquirerPromptConstructor = new (...args: unknown[]) => EnquirerTogglePrompt;
+
+interface EnquirerTogglePrompt {
+  value: boolean;
+  disabled: string;
+  enabled: string;
+  styles: {
+    primary: {
+      underline(value: string): string;
+    };
+    muted(value: string): string;
+  };
+}
 
 type PromptsFunction = (question: unknown, options?: unknown) => Promise<Record<string, unknown>>;
 
@@ -228,31 +250,40 @@ class LibraryPromptRuntime implements PromptRuntime {
   }
 
   async confirm(message: string, initial = true): Promise<boolean> {
-    const prompts = await loadPrompts();
-    let canceled = false;
-    const answers = await prompts(
-      {
-        type: "confirm",
+    const Enquirer = await loadEnquirer();
+    const enquirer = new Enquirer();
+    enquirer.register("yes-no-toggle", createYesNoTogglePrompt(Enquirer.prompts.Toggle));
+    try {
+      const answers = await enquirer.prompt<{ confirmed?: unknown }>({
+        type: "yes-no-toggle",
         name: "confirmed",
         message,
+        enabled: "Yes",
+        disabled: "No",
         initial,
         stdin: this.input,
         stdout: this.output
-      },
-      {
-        onCancel: () => {
-          canceled = true;
-          return false;
-        }
-      }
-    );
-    if (canceled || typeof answers.confirmed !== "boolean") throw new HostSelectionCanceledError();
-    return answers.confirmed;
+      });
+      if (typeof answers.confirmed !== "boolean") throw new HostSelectionCanceledError();
+      return answers.confirmed;
+    } catch (error) {
+      throw mapPromptError(error);
+    }
   }
 }
 
+function createYesNoTogglePrompt(TogglePrompt: EnquirerPromptConstructor): EnquirerPromptConstructor {
+  return class YesNoTogglePrompt extends TogglePrompt {
+    format(): string {
+      const active = (value: string) => this.styles.primary.underline(value);
+      const value = [this.value ? active(this.enabled) : this.enabled, this.value ? this.disabled : active(this.disabled)];
+      return value.join(this.styles.muted(" / "));
+    }
+  };
+}
+
 async function loadEnquirer(): Promise<EnquirerConstructor> {
-  const imported = (await import("enquirer")) as { default?: EnquirerConstructor };
+  const imported = (await import("enquirer")) as unknown as { default?: EnquirerConstructor };
   if (!imported.default) throw new Error("Failed to load enquirer.");
   return imported.default;
 }

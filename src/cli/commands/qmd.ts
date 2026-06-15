@@ -8,7 +8,7 @@ export async function qmdCommand(options: CommandOptions): Promise<void> {
   const root = path.resolve(options.root);
   switch (options.qmdAction) {
     case "enable": {
-      const result = await enableQmdWithInstallPrompt(root, { optional: false, prompt: !options.json && !options.quiet, now: fixedNow() });
+      const result = await enableQmdWithInstallPrompt(root, { optional: false, prompt: !options.json && !options.quiet, showCommands: !options.json && !options.quiet, now: fixedNow() });
       printQmdResult(result, options);
       return;
     }
@@ -23,7 +23,7 @@ export async function qmdCommand(options: CommandOptions): Promise<void> {
       return;
     }
     case "reindex": {
-      const result = await reindexQmd(root, { now: fixedNow() });
+      const result = await reindexQmd(root, { showCommands: !options.json && !options.quiet, now: fixedNow() });
       printQmdResult(result, options);
       return;
     }

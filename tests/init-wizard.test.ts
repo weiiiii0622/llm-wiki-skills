@@ -26,15 +26,37 @@ const promptsMock = vi.hoisted(() => {
   };
 });
 
-const enquirerMock = vi.hoisted(() => ({
-  prompt: vi.fn()
-}));
+const enquirerMock = vi.hoisted(() => {
+  class TogglePrompt {
+    public disabled = "No";
+    public enabled = "Yes";
+    public value = true;
+    public styles = {
+      primary: {
+        underline: (value: string) => `[${value}]`
+      },
+      muted: (value: string) => value
+    };
+  }
+  const instance = {
+    prompt: vi.fn(),
+    register: vi.fn()
+  };
+  const Enquirer = vi.fn(function EnquirerMock() {
+    return instance;
+  });
+  Enquirer.prompts = { Toggle: TogglePrompt };
+  return {
+    Enquirer,
+    TogglePrompt,
+    prompt: instance.prompt,
+    register: instance.register
+  };
+});
 
 vi.mock("prompts", () => ({ default: promptsMock.prompt }));
 vi.mock("enquirer", () => ({
-  default: vi.fn(function EnquirerMock() {
-    return enquirerMock;
-  })
+  default: enquirerMock.Enquirer
 }));
 
 describe("topic templates", () => {
@@ -147,6 +169,47 @@ describe("init wizard", () => {
     const runtime = createPromptRuntime({ output: { write: vi.fn() } as unknown as NodeJS.WriteStream });
 
     await expect(runtime.selectHosts(hostPromptChoices())).rejects.toThrow("You must select at least one host.");
+  });
+
+  it("keeps Yes on the left while preserving confirmation defaults", async () => {
+    enquirerMock.prompt.mockClear();
+    enquirerMock.register.mockClear();
+    promptsMock.prompt.mockClear();
+    enquirerMock.prompt.mockResolvedValueOnce({ confirmed: true }).mockResolvedValueOnce({ confirmed: false });
+    const runtime = createPromptRuntime({ output: { write: vi.fn() } as unknown as NodeJS.WriteStream });
+
+    await expect(runtime.confirm("Create these LLM Wiki skill files?", true)).resolves.toBe(true);
+    await expect(runtime.confirm("Set up qmd keyword search acceleration?", false)).resolves.toBe(false);
+
+    expect(enquirerMock.prompt).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        type: "yes-no-toggle",
+        name: "confirmed",
+        message: "Create these LLM Wiki skill files?",
+        enabled: "Yes",
+        disabled: "No",
+        initial: true
+      })
+    );
+    expect(enquirerMock.prompt).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        type: "yes-no-toggle",
+        name: "confirmed",
+        message: "Set up qmd keyword search acceleration?",
+        enabled: "Yes",
+        disabled: "No",
+        initial: false
+      })
+    );
+    expect(enquirerMock.register).toHaveBeenCalledWith("yes-no-toggle", expect.any(Function));
+    const YesNoTogglePrompt = enquirerMock.register.mock.calls[0]?.[1] as typeof enquirerMock.TogglePrompt;
+    const enabled = new YesNoTogglePrompt();
+    expect(enabled.format()).toBe("[Yes] / No");
+    enabled.value = false;
+    expect(enabled.format()).toBe("Yes / [No]");
+    expect(promptsMock.prompt).not.toHaveBeenCalled();
   });
 
   it("passes topic descriptions inline so prompts can render them beside the topic", async () => {

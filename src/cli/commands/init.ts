@@ -10,7 +10,13 @@ export async function initCommand(options: CommandOptions): Promise<void> {
   const plan = await resolveInitPlan(options);
   const results = await executeInitPlan(plan);
   const qmdResult = plan.qmdEnabled
-    ? await enableQmdWithInstallPrompt(plan.root, { installApproved: plan.qmdInstallApproved, optional: true, prompt: !options.json && !options.quiet, now: fixedNow() })
+    ? await enableQmdWithInstallPrompt(plan.root, {
+        installApproved: plan.qmdInstallApproved,
+        optional: true,
+        prompt: !options.json && !options.quiet,
+        showCommands: !options.json && !options.quiet,
+        now: fixedNow()
+      })
     : undefined;
   const customHandoffPrompt = buildCustomTopicHandoffPrompt(plan.topic);
   const obsidianHandoff = buildObsidianHandoff(plan.obsidianEnabled);

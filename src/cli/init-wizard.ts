@@ -47,7 +47,7 @@ export async function runInitWizard(
   if (qmdEnabled) {
     qmdInstallApproved = await runtime.confirm(QMD_INSTALL_PROMPT, false);
     if (qmdInstallApproved) {
-      await installQmdPackage();
+      await installQmdPackage(root);
       qmdInstallApproved = undefined;
     }
   }

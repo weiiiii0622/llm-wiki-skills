@@ -1,4 +1,5 @@
 import { execFile, spawn } from "node:child_process";
+import { realpathSync } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 import { mkdir, rm } from "node:fs/promises";
@@ -28,12 +29,14 @@ export interface QmdRunner {
 
 export interface QmdRunOptions {
   dimOutput?: boolean;
+  showCommand?: boolean;
   streamOutput?: boolean;
 }
 
 export interface QmdEnableOptions {
   install?: boolean;
   runner?: QmdRunner;
+  showCommands?: boolean;
   now?: Date;
 }
 
@@ -75,6 +78,7 @@ export class ExecFileQmdRunner implements QmdRunner {
     try {
       const result = await execFileAsync(command, args, {
         cwd,
+        env: childEnv(cwd),
         shell: false,
         windowsHide: true,
         maxBuffer: 1024 * 1024
@@ -91,13 +95,14 @@ export class ExecFileQmdRunner implements QmdRunner {
 export async function enableQmd(root: string, options: QmdEnableOptions = {}): Promise<QmdLifecycleResult> {
   const resolvedRoot = path.resolve(root);
   const runner = options.runner ?? new ExecFileQmdRunner();
-  if (options.install) await installQmdPackage(runner);
-  await runQmdStep(runner, resolvedRoot, ["--version"], (message) => new QmdNotInstalledError(message));
-  await runQmdStep(runner, resolvedRoot, ["doctor"], (message) => new QmdDoctorFailedError(message));
-  await runQmdStep(runner, resolvedRoot, ["init"], (message) => new QmdCommandError(message));
+  if (options.install) await installQmdPackage(resolvedRoot, runner);
+  const runOptions = commandDisplayOptions(options.showCommands);
+  await runQmdStep(runner, resolvedRoot, ["--version"], (message) => new QmdNotInstalledError(message), "qmd", runOptions);
+  await runQmdStep(runner, resolvedRoot, ["doctor"], (message) => new QmdDoctorFailedError(message), "qmd", runOptions);
+  await runQmdStep(runner, resolvedRoot, ["init"], (message) => new QmdCommandError(message), "qmd", runOptions);
   const collection = qmdCollectionName(resolvedRoot);
-  await addQmdCollection(runner, resolvedRoot, collection);
-  await runQmdStep(runner, resolvedRoot, ["update"], (message) => new QmdIndexUpdateError(message));
+  await addQmdCollection(runner, resolvedRoot, collection, runOptions);
+  await runQmdStep(runner, resolvedRoot, ["update"], (message) => new QmdIndexUpdateError(message), "qmd", runOptions);
 
   const indexedAt = (options.now ?? new Date()).toISOString();
   await atomicWriteText(resolvedRoot, QMD_DOCS_PATH, qmdDocsContent(collection));
@@ -112,13 +117,13 @@ export async function enableQmd(root: string, options: QmdEnableOptions = {}): P
   };
 }
 
-export async function reindexQmd(root: string, options: Pick<QmdEnableOptions, "runner" | "now"> = {}): Promise<QmdLifecycleResult> {
+export async function reindexQmd(root: string, options: Pick<QmdEnableOptions, "runner" | "showCommands" | "now"> = {}): Promise<QmdLifecycleResult> {
   const resolvedRoot = path.resolve(root);
   const manifest = await loadManifest(resolvedRoot);
   const qmd = manifest.integrations?.qmd;
   if (!qmd?.enabled) throw new QmdCommandError("qmd is not enabled for this wiki. Run `llm-wiki-skills qmd enable` first.");
   const runner = options.runner ?? new ExecFileQmdRunner();
-  await runQmdStep(runner, resolvedRoot, ["update"], (message) => new QmdIndexUpdateError(message));
+  await runQmdStep(runner, resolvedRoot, ["update"], (message) => new QmdIndexUpdateError(message), "qmd", commandDisplayOptions(options.showCommands));
   const indexedAt = (options.now ?? new Date()).toISOString();
   await writeQmdEnabledManifest(resolvedRoot, indexedAt);
   return {
@@ -167,17 +172,19 @@ export async function qmdStatus(root: string): Promise<QmdLifecycleResult> {
   };
 }
 
-export async function installQmdPackage(runner: QmdRunner = new ExecFileQmdRunner()): Promise<void> {
+export async function installQmdPackage(root: string, runner: QmdRunner = new ExecFileQmdRunner()): Promise<void> {
+  const resolvedRoot = path.resolve(root);
+  await mkdir(resolvedRoot, { recursive: true });
   printInstallStart();
-  await runQmdStep(runner, process.cwd(), ["install", "-g", "@tobilu/qmd"], (message) => new QmdCommandError(message), "npm", {
+  await runQmdStep(runner, resolvedRoot, ["install", "-g", "@tobilu/qmd"], (message) => new QmdCommandError(message), "npm", {
     dimOutput: true,
     streamOutput: true
   });
 }
 
-async function addQmdCollection(runner: QmdRunner, root: string, collection: string): Promise<void> {
+async function addQmdCollection(runner: QmdRunner, root: string, collection: string, options: QmdRunOptions = {}): Promise<void> {
   try {
-    await runQmdStep(runner, root, ["collection", "add", collection, path.join(root, "wiki")], (message) => new QmdCollectionError(message));
+    await runQmdStep(runner, root, ["collection", "add", path.join(root, "wiki"), "--name", collection], (message) => new QmdCollectionError(message), "qmd", options);
   } catch (error) {
     if (error instanceof QmdCollectionError && /collection .+ already exists/i.test(error.message)) return;
     throw error;
@@ -193,6 +200,7 @@ async function runQmdStep(
   options: QmdRunOptions = {}
 ): Promise<void> {
   try {
+    if (options.showCommand) printCommandStart(command, args);
     await runner.run(command, args, root, options);
   } catch (error) {
     if (error instanceof QmdNotInstalledError || error instanceof QmdRuntimeUnsupportedError) throw error;
@@ -205,6 +213,7 @@ function runStreaming(command: string, args: string[], cwd: string, options: Qmd
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd,
+      env: childEnv(cwd),
       shell: false,
       windowsHide: true,
       stdio: ["ignore", "pipe", "pipe"]
@@ -231,6 +240,34 @@ function runStreaming(command: string, args: string[], cwd: string, options: Qmd
       else reject(new QmdCommandError(`${command} ${args.join(" ")} failed${stderr.trim() ? `: ${stderr.trim()}` : "."}`));
     });
   });
+}
+
+function commandDisplayOptions(showCommands: boolean | undefined): QmdRunOptions {
+  return showCommands ? { showCommand: true } : {};
+}
+
+function childEnv(cwd: string): NodeJS.ProcessEnv {
+  return { ...process.env, PWD: childPwd(cwd) };
+}
+
+function childPwd(cwd: string): string {
+  try {
+    return realpathSync(cwd);
+  } catch {
+    return path.resolve(cwd);
+  }
+}
+
+function printCommandStart(command: string, args: string[]): void {
+  writeDimmedOutput(process.stdout, `Running \`${formatCommand(command, args)}\`...\n`);
+}
+
+function formatCommand(command: string, args: string[]): string {
+  return [command, ...args.map(formatCommandArg)].join(" ");
+}
+
+function formatCommandArg(arg: string): string {
+  return /^[A-Za-z0-9_./:=@+-]+$/.test(arg) ? arg : JSON.stringify(arg);
 }
 
 function printInstallStart(): void {
