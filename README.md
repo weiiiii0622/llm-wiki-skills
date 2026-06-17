@@ -41,7 +41,7 @@ AI agents are useful until they forget the context you gave them last week. `llm
 
 ## Getting Started
 
-### 1. `npx` (Recomended)
+### 1. `npx` (Recommended)
 Run the setup wizard in any repo or markdown workspace:
 
 ```sh
@@ -67,13 +67,12 @@ Common flags:
 | `--qmd` | Add optional local qmd search support. |
 | `--json` / `--quiet` | Use in scripts or CI. |
 
-### 2. Global `npm` install:
+### 2. Global `npm` install
 
 ```sh
 npm install -g llm-wiki-skills
 llm-wiki-skills init
 ```
-
 
 Then check the install:
 
@@ -156,14 +155,14 @@ npx llm-wiki-skills ingest validate --plan PLAN_ID
 
 The ingest commands help track source files before your agent synthesizes them into wiki pages.
 
-It is suggested to have AI Agents to handle this workflow, by having the agents to ingest the file, agents will auto-detect these tools and use them directly.
+For best results, ask your AI agent to handle this workflow. The installed skills tell the agent when to use these commands.
 
 ## Example Workflow
 
 ```text
 1. Drop source material into raw/sources/
 2. Ask the agent to use llm-wiki-ingest
-3. The agent handle ingest workflow automatically
+3. The agent handles the ingest workflow automatically
 4. The agent writes source summaries and durable wiki pages
 5. Ask questions with llm-wiki-query
 6. Run llm-wiki-lint before important handoffs
