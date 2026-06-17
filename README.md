@@ -1,398 +1,220 @@
-# llm-wiki-skills
+<p align="center">
+  <img src="https://raw.githubusercontent.com/weiiiii0622/llm-wiki-skills/main/media/icon.png" alt="llm-wiki-skills icon" width="144">
+</p>
 
-Install local skills that teach Codex or Claude Code how to maintain a source-grounded markdown wiki inside your project.
+<h1 align="center">llm-wiki-skills</h1>
 
-If your AI assistant keeps losing context between sessions, this gives it a durable place to put what it learns: original notes in `raw/`, cleaned-up knowledge in `wiki/`, and repeatable workflows for ingesting, querying, and checking that knowledge.
+<p align="center">
+  Local-first wiki skills for Codex and Claude Code.
+  <br>
+  Turn scattered project notes into a durable, source-grounded knowledge vault your agent can maintain.
+</p>
 
-## What It Is For
-
-Use `llm-wiki-skills` when you want an AI coding agent to build and maintain a local knowledge base for a repo, research project, product spec, meeting notes folder, or any markdown-heavy workspace.
-
-It is useful when you want to:
-
-- turn scattered notes and source material into durable wiki pages;
-- ask questions against local project knowledge without starting from scratch;
-- keep raw evidence separate from summarized knowledge;
-- give Codex and Claude Code the same wiki workflow;
-- keep everything local, file-based, and easy to inspect.
-
-The CLI does not call a hosted service. It installs the local folder structure and agent skills. Optional qmd support can add local SQLite-backed hybrid search, including on-device semantic search and reranking, while markdown remains the source of truth.
-
-## Quickstart
-
-Enter setup wizard:
+<p align="center">
+  <a href="https://www.npmjs.com/package/llm-wiki-skills"><img src="https://img.shields.io/npm/v/llm-wiki-skills?color=111827" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/llm-wiki-skills"><img src="https://img.shields.io/npm/dm/llm-wiki-skills?color=2563eb" alt="npm downloads"></a>
+  <a href="https://github.com/weiiiii0622/llm-wiki-skills/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/llm-wiki-skills?color=0f766e" alt="license"></a>
+</p>
 
 ```sh
 npx llm-wiki-skills init
 ```
 
-Check that the local install is complete:
+## Why This Exists
+
+AI agents are useful until they forget the context you gave them last week. `llm-wiki-skills` gives them a local place to preserve what they learn:
+
+| Before | After |
+| --- | --- |
+| Notes, PDFs, meeting docs, and decisions live in scattered files. | Sources stay in `raw/`, durable knowledge lands in `wiki/`, and agents know how to update it. |
+| Every session starts with "read these files again." | Codex or Claude Code can ingest, query, and lint the same local vault. |
+| Search depends on whatever the model happens to load. | Markdown stays canonical, with optional local qmd search acceleration. |
+
+## What Makes It Different
+
+- **Agent-native:** installs skills for Codex and Claude Code, not just docs for humans.
+- **Local-first:** no hosted memory service, no remote database, no required account.
+- **Source-grounded:** raw evidence and synthesized wiki pages stay separate.
+- **Topic-aware:** choose a scaffold for research, product work, trips, investing, medical notes, legal/admin records, and more.
+- **Obsidian-ready:** generated vault metadata works with Obsidian's native graph view.
+- **Search-upgradable:** optional `qmd` support adds local SQLite-backed hybrid search while markdown remains the source of truth.
+
+## Getting Started
+
+Run the setup wizard in any repo or markdown workspace:
+
+```sh
+npx llm-wiki-skills init
+```
+
+The wizard asks which agent host to install, which topic scaffold to use, and whether to prepare the folder as an Obsidian vault.
+
+For a non-interactive Codex setup:
+
+```sh
+npx llm-wiki-skills init --host codex --topic work-project --quiet
+```
+
+Then check the install:
 
 ```sh
 npx llm-wiki-skills status
 ```
 
-By default, `init` also makes the folder ready to open as an Obsidian vault:
+<p align="center">
+  <img src="https://raw.githubusercontent.com/weiiiii0622/llm-wiki-skills/main/media/llm-wiki-skills-installation.gif" alt="Installing llm-wiki-skills and creating a local wiki vault" width="760">
+</p>
+
+## Installation
+
+Use it directly with `npx`:
 
 ```sh
-npx llm-wiki-skills init --host codex
+npx llm-wiki-skills init
 ```
 
-Use `--no-obsidian` if you only want the agent skills and markdown wiki files.
-
-qmd hybrid search acceleration is optional and off by default:
+Or install it globally:
 
 ```sh
-npx llm-wiki-skills init --host codex --qmd
+npm install -g llm-wiki-skills
+llm-wiki-skills init
 ```
 
-If qmd is not installed, interactive setup asks before running `npm install -g @tobilu/qmd`.
+Requirements:
 
-## How You Use It
+- Node.js 22 or newer.
+- Codex or Claude Code if you want an agent to use the generated skills.
+- A project folder or markdown vault where local files can be created.
 
-After `init`, ask your agent to use one of the installed skills.
+#### Non-interactive installation supported
 
-Ingest source material:
+```sh
+npx llm-wiki-skills init --host codex --topic product-builder
+```
+
+Common flags:
+
+| Flag | Use it when |
+| --- | --- |
+| `--host codex` | Install Codex repo skills under `.agents/skills/`. |
+| `--host claude-code` | Install Claude Code project skills under `.claude/skills/`. |
+| `--topic work-project` | Add topic directories and routing guidance. |
+| `--obsidian` / `--no-obsidian` | Enable or skip Obsidian vault metadata. |
+| `--qmd` | Add optional local qmd search support. |
+| `--json` / `--quiet` | Use in scripts or CI. |
+
+## Usage
+
+### Ask Your Agent to Use the Wiki
+
+After setup, use the installed skills in your agent:
 
 ```text
-Use the llm-wiki-ingest skill. Ingest raw/sources/customer-notes.md into the wiki and update any overlapping pages.
+Use the llm-wiki-ingest skill. Ingest raw/sources/customer-notes.md
+into the wiki and update any overlapping pages.
 ```
-
-Ask a question from the wiki:
 
 ```text
-Use the llm-wiki-query skill. What do we know about onboarding friction? Cite the wiki pages you used.
+Use the llm-wiki-query skill. What do we know about onboarding friction?
+Cite the wiki pages you used.
 ```
-
-Health-check the wiki:
 
 ```text
-Use the llm-wiki-lint skill. Find stale claims, contradictions, orphan pages, missing cross-references, and gaps worth investigating.
+Use the llm-wiki-lint skill. Find stale claims, contradictions,
+or missing cross-references before handoff.
 ```
 
-## What Gets Installed
+### Plan Larger Ingests
 
-`init` creates a local wiki workspace and host-specific skills:
+For bigger raw folders, create a batch plan first:
+
+```sh
+npx llm-wiki-skills ingest plan --raw raw/sources
+npx llm-wiki-skills ingest status --plan PLAN_ID
+npx llm-wiki-skills ingest validate --plan PLAN_ID
+```
+
+The ingest commands help track source files before your agent synthesizes them into wiki pages.
+
+It is suggested to have AI Agents to handle this workflow, by having the agents to ingest the file, agents will auto-detect these tools and use them directly.
+
+## Example Workflow
+
+```text
+1. Drop source material into raw/sources/
+2. Ask the agent to use llm-wiki-ingest
+3. The agent handle ingest workflow automatically
+4. The agent writes source summaries and durable wiki pages
+5. Ask questions with llm-wiki-query
+6. Run llm-wiki-lint before important handoffs
+```
+
+A small demo vault is included at [`fixtures/demo-vault`](fixtures/demo-vault). Use it to inspect the expected shape before initializing your own workspace.
+
+## Topic Vault Structure
+
+Every vault starts with the same simple contract:
 
 ```text
 raw/                         preserved source material
 wiki/                        durable markdown knowledge
 docs/llm-wiki-contract.md    local wiki rules
 docs/llm-wiki-workflows.md   ingest/query/lint workflow reference
-.obsidian/                   stable Obsidian vault settings
-docs/llm-wiki-qmd.md         qmd usage notes, only when qmd is enabled
+.obsidian/                   optional Obsidian vault settings
 .llm-wiki-skills.json        install manifest for status checks
 ```
 
-For Codex, it writes repo-scoped skills under `.agents/skills/`. For Claude Code, it writes project skills under `.claude/skills/`. Existing files are skipped on rerun so local edits are not overwritten.
+Topic scaffolds add useful `wiki/` categories and a routing guide at `docs/llm-wiki-routing.md`.
 
-## Obsidian Vault Support
+| Topic | Best for | Example categories |
+| --- | --- | --- |
+| `general` | Mixed notes and broad research | projects, areas, resources, questions |
+| `study-research` | Papers, courses, experiments | concepts, papers, methods, datasets |
+| `work-project` | Delivery context and team knowledge | architecture, decisions, meetings, risks |
+| `product-builder` | Customer evidence and product bets | personas, problems, competitors, metrics |
+| `writing-content` | Essays, drafts, editorial research | audience, topics, claims, outlines |
+| `trip-plan` | Travel planning and bookings | destinations, hotels, transport, itinerary |
+| `investment` | Research, theses, watchlists | companies, valuation, catalysts, postmortems |
+| `home-life` | Household systems and records | maintenance, purchases, utilities, documents |
+| `medical` | Clinical study notes and references | conditions, diagnostics, drugs, guidelines |
+| `legal-admin` | Contracts, deadlines, admin records | matters, obligations, agencies, contacts |
+| `custom` | Anything else | starts from `general` plus your custom label |
 
-Obsidian support is enabled by default. The generated vault includes stable settings for app behavior, core plugins, native graph view, and an ownership marker at `.obsidian/llm-wiki-skills.json`.
-
-The graph view is scoped to `path:wiki/` so Obsidian's native graph focuses on synthesized wiki pages while raw evidence stays available under `raw/`.
-
-`init` also adds a managed `.gitignore` block for Obsidian runtime files such as `.obsidian/workspace.json`. It does not ignore generated stable settings, plugins, themes, or snippets.
-
-Flags:
-
-```sh
-npx llm-wiki-skills init --obsidian
-npx llm-wiki-skills init --no-obsidian
-```
-
-## qmd Search Support
-
-qmd support is optional. When enabled, generated query skills still read `wiki/index.md` first and treat markdown under `wiki/` as canonical. qmd is used for local candidate discovery:
-
-- `qmd query --json` when hybrid semantic search is ready
-- `QMD_FORCE_CPU=1 qmd query --json` when setup fell back to CPU mode
-- `qmd search --json` when semantic setup fell back to full-text search
-
-qmd requires Node.js 22 or newer and an external `qmd` executable from `@tobilu/qmd`. The CLI does not bundle qmd.
-
-Semantic setup runs `qmd embed` and may download local GGUF models on first use. Current qmd defaults are about 2GB total: `embeddinggemma-300M-Q8_0` (~300MB), `qwen3-reranker-0.6b-q8_0` (~640MB), and `qmd-query-expansion-1.7B-q4_k_m` (~1.1GB), cached under `~/.cache/qmd/models/`. If GPU setup fails in an interactive terminal, the CLI asks whether to continue in CPU mode or fall back to full-text search. In non-interactive mode, it automatically retries in CPU mode.
-
-Commands:
+Example:
 
 ```sh
-npx llm-wiki-skills init --host codex --qmd
-npx llm-wiki-skills qmd enable
-npx llm-wiki-skills qmd status
-npx llm-wiki-skills qmd reindex
-npx llm-wiki-skills qmd disable
+npx llm-wiki-skills init --host codex --topic study-research
 ```
 
-`qmd disable` is non-destructive: it removes llm-wiki-skills qmd metadata and generated qmd docs, but leaves external qmd indexes and collections untouched.
-
-## Topic Directory Scaffolds
-
-`init` can add category directories for a specific kind of wiki. Use `--topic <id>` or the equivalent `--template <id>`. Topic directories and the routing guide are optional scaffolds: rerunning `init --topic <id>` recreates missing scaffold outputs, but `status` does not fail if you delete or replace them.
-
-Every built-in topic creates:
-
-- category directories under `wiki/`
-- `docs/llm-wiki-routing.md`, which tells generated agent skills how to route ingested notes
-
-Available topic options:
-
-### `general`
-
-Use this for mixed notes, broad research, and a neutral starting point.
-
-Creates these directories:
-
-```text
-wiki/
-|-- projects/
-|-- areas/
-|-- resources/
-|-- archives/
-|-- sources/
-|-- questions/
-`-- templates/
-```
-
-- examples: reading notes, personal research, small reusable answers
-
-### `study-research`
-
-Use this for papers, courses, research notes, claims, and unanswered questions.
-
-Creates these directories:
+Creates a research-friendly vault like:
 
 ```text
 wiki/
 |-- concepts/
 |-- papers/
-|-- authors/
 |-- methods/
 |-- datasets/
-|-- experiments/
-|-- comparisons/
 |-- claims-and-evidence/
 `-- templates/
 ```
 
-- examples: literature notes, research questions, datasets
+## qmd Search Support
 
-### `work-project`
-
-Use this for project context, decisions, stakeholders, risks, and delivery notes.
-
-Creates these directories:
-
-```text
-wiki/
-|-- architecture/
-|-- features/
-|-- services/
-|-- projects/
-|-- decisions/
-|-- meetings/
-|-- requirements/
-|-- stakeholders/
-|-- milestones/
-|-- incidents/
-|-- risks/
-|-- retrospectives/
-`-- templates/
-```
-
-- examples: decision logs, meeting notes, project references
-
-### `product-builder`
-
-Use this for customer evidence, product bets, market notes, and build decisions.
-
-Creates these directories:
-
-```text
-wiki/
-|-- personas/
-|-- problems/
-|-- use-cases/
-|-- features/
-|-- user-journeys/
-|-- competitors/
-|-- pricing/
-|-- metrics/
-|-- growth/
-|-- experiments/
-`-- templates/
-```
-
-- examples: customer interviews, experiment notes, competitor research
-
-### `writing-content`
-
-Use this for source material, draft ideas, editorial notes, and reusable phrasing.
-
-Creates these directories:
-
-```text
-wiki/
-|-- audience/
-|-- topics/
-|-- series/
-|-- claims-and-sources/
-|-- examples/
-|-- outlines/
-`-- templates/
-```
-
-- examples: essay outlines, draft research, published pieces
-
-### `trip-plan`
-
-Use this for destination research, itineraries, bookings, travel constraints, and day plans.
-
-Creates these directories:
-
-```text
-wiki/
-|-- destinations/
-|-- cities/
-|-- attractions/
-|-- restaurants/
-|-- hotels/
-|-- transport/
-|-- budget/
-|-- itinerary/
-`-- templates/
-```
-
-- examples: itineraries, booking references, destination notes
-
-### `investment`
-
-Use this for investment policy, watchlists, portfolio notes, company research, theses, valuation, risks, catalysts, and decision reviews. It keeps investment notes source-grounded and does not replace professional advice.
-
-Creates these directories:
-
-```text
-wiki/
-|-- portfolio/
-|-- companies/
-|-- industries/
-|-- theses/
-|-- valuation/
-|-- risks/
-|-- catalysts/
-|-- competitors/
-|-- macro/
-|-- postmortems/
-`-- templates/
-```
-
-- examples: company notes, valuation notes, investment research
-
-### `home-life`
-
-Use this for household systems, family operations, recurring routines, records, and home projects.
-
-Creates these directories:
-
-```text
-wiki/
-|-- routines/
-|-- appliances/
-|-- maintenance/
-|-- repairs/
-|-- purchases/
-|-- subscriptions/
-|-- utilities/
-|-- inventory/
-|-- documents/
-`-- templates/
-```
-
-- examples: home projects, important records, recurring routines
-
-### `medical`
-
-Use this for anatomy, physiology, conditions, diagnostics, drugs, procedures, guidelines, cases, and questions for professional review.
-
-Creates these directories:
-
-```text
-wiki/
-|-- anatomy/
-|-- physiology/
-|-- conditions/
-|-- diagnostics/
-|-- drugs/
-|-- procedures/
-|-- guidelines/
-|-- cases/
-|-- questions/
-|-- sources/
-`-- templates/
-```
-
-- examples: clinical references, drug notes, diagnostic criteria
-
-### `legal-admin`
-
-Use this for administrative records, legal references, contracts, deadlines, and unresolved questions. It keeps legal notes organized and does not replace legal advice.
-
-Creates these directories:
-
-```text
-wiki/
-|-- legal-matters/
-|-- contracts/
-|-- obligations/
-|-- deadlines/
-|-- applications/
-|-- agencies/
-|-- contacts/
-|-- decision-records/
-`-- templates/
-```
-
-- examples: contracts, applications, deadline checklists
-
-### `custom`
-
-Use this when none of the built-in topics match your vault.
+qmd is optional and off by default. Enable it when your wiki is large enough that local hybrid search is useful:
 
 ```sh
-npx llm-wiki-skills init --host codex --topic custom --custom-topic "board game design"
+npx llm-wiki-skills init --host codex --qmd
+npx llm-wiki-skills qmd status
+npx llm-wiki-skills qmd reindex
 ```
 
-`custom` uses the `general` scaffold, creates `docs/llm-wiki-routing.md`, records custom topic metadata, and prints a handoff prompt you can give to your own LLM. The CLI does not call a hosted LLM or import generated structure files.
+Markdown under `wiki/` remains canonical. qmd is only used for local candidate discovery.
 
-## Commands
+## What This Is / Is Not
 
-```sh
-llm-wiki-skills init [--root DIR] [--host codex|claude-code] [--topic ID] [--obsidian|--no-obsidian] [--qmd|--no-qmd] [--json] [--quiet]
-llm-wiki-skills status [--root DIR] [--json] [--quiet]
-llm-wiki-skills qmd enable|disable|status|reindex [--root DIR] [--json] [--quiet]
-```
-
-`init` installs the local wiki contract, starter pages, optional topic scaffold, shared references, selected host skills, and a manifest.
-
-`--template ID` is an alias for `--topic ID`. If both are provided, they must match.
-
-`status` verifies the manifest and required files still match the selected hosts.
-
-If `--host` is omitted in an interactive terminal, `init` opens a guided setup: choose host targets, choose a topic, review the files that will be created or refreshed, then confirm before anything is written. In scripts, CI, `--json`, or `--quiet` usage, pass `--host`.
-
-## Requirements
-
-- Node.js 22 or newer.
-- Codex or Claude Code if you want an agent to use the generated skills.
-- A project directory or markdown vault where local files can be created.
-
-## What This Is Not
-
-`llm-wiki-skills` is not a note-taking app, search backend, hosted memory service, or automatic importer. It is a small local installer for repeatable AI-agent wiki workflows.
-
-## Development
-
-```sh
-npm install
-npm test
-npm run smoke
-```
+| This is | This is not |
+| --- | --- |
+| A local installer for agent wiki workflows. | A hosted memory service. |
+| A way to keep raw evidence and durable knowledge organized. | A replacement for reviewing source material. |
+| A bridge between markdown vaults, Codex, Claude Code, and Obsidian. | A full note-taking app or automatic importer. |
+| Optional local search acceleration through qmd. | A required cloud search backend. |
