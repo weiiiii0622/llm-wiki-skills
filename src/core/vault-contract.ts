@@ -2,6 +2,7 @@ import path from "node:path";
 import { mkdir } from "node:fs/promises";
 import { pathExists, writeTextIfAbsent } from "./fs.js";
 import { VaultNotFoundError } from "./errors.js";
+import { MULTI_FILE_INGEST_PROTOCOL } from "./ingest-protocol.js";
 
 export interface VaultFileEntry {
   relativePath: string;
@@ -173,6 +174,8 @@ This repository is a local-first LLM wiki vault.
 5. Update overlapping topic, entity, concept, question, or topic-specific category pages.
 6. Flag contradictions when new sources challenge older claims.
 7. Update \`wiki/index.md\` and \`wiki/log.md\`.
+
+${MULTI_FILE_INGEST_PROTOCOL}
 
 ## Query
 

@@ -1,0 +1,5 @@
+Follow-up ideas:
+
+- Add machine-readable ingest status for resumable source intake.
+- Validate source summaries before final handoff.
+- Reindex qmd once after all wiki writes are done.

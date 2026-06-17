@@ -316,7 +316,7 @@ describe("cli", () => {
     const qmdLog = await readFile(fake.log, "utf8");
     expect(qmdLog).toContain("collection add");
     expect(qmdLog).toContain("qmd update");
-    expect(qmdLog).toContain("qmd embed");
+    expect(qmdLog).toContain(`qmd embed -c ${manifest.integrations.qmd.collection} --max-docs-per-batch 8 --max-batch-mb 8`);
   });
 
   it("init --qmd prompts to install qmd when missing and user accepts", async () => {
@@ -404,12 +404,14 @@ describe("cli", () => {
     expect(enabled.stdout).toContain("Running `qmd collection add");
     expect(enabled.stdout).toContain(" --name ");
     expect(enabled.stdout).toContain("Running `qmd update`...");
-    expect(enabled.stdout).toContain("Running `qmd embed`...");
+    expect(enabled.stdout).toContain("Running `qmd embed -c ");
+    expect(enabled.stdout).toContain(" --max-docs-per-batch 8 --max-batch-mb 8`...");
     expect(enabled.stdout).toContain("qmd: enabled");
 
     const reindexed = await execaNode(["dist/cli/index.js", "qmd", "reindex", "--root", root], fixedEnv(undefined, fake.env));
     expect(reindexed.stdout).toContain("Running `qmd update`...");
-    expect(reindexed.stdout).toContain("Running `qmd embed`...");
+    expect(reindexed.stdout).toContain("Running `qmd embed -c ");
+    expect(reindexed.stdout).toContain(" --max-docs-per-batch 8 --max-batch-mb 8`...");
     expect(reindexed.stdout).toContain("qmd: reindexed");
   });
 
@@ -466,7 +468,7 @@ describe("cli", () => {
     const log = await readFile(fake.log, "utf8");
     expect(log).toContain("embed-wiki exists");
     expect(log.indexOf("qmd collection add")).toBeLessThan(log.indexOf("qmd update"));
-    expect(log.indexOf("qmd update")).toBeLessThan(log.indexOf("qmd embed"));
+    expect(log.indexOf("qmd update")).toBeLessThan(log.indexOf("qmd embed -c"));
   });
 
   it("non-interactive semantic setup retries qmd embed in CPU mode after GPU failure", async () => {
@@ -484,7 +486,7 @@ describe("cli", () => {
     const manifest = JSON.parse(await readFile(path.join(root, ".llm-wiki-skills.json"), "utf8"));
     expect(manifest.integrations.qmd).toMatchObject({ searchMode: "hybrid", runtimeMode: "cpu-forced" });
     const log = await readFile(fake.log, "utf8");
-    expect(log.match(/qmd embed/g)).toHaveLength(2);
+    expect(log.match(/qmd embed -c .+ --max-docs-per-batch 8 --max-batch-mb 8/g)).toHaveLength(2);
     expect(log).toContain("embed-cpu 1");
   });
 
@@ -634,6 +636,10 @@ describe("cli", () => {
     expect(combined).toContain("Orphan pages");
     expect(combined).toContain("Data gaps");
     expect(combined).toContain("new questions or sources worth investigating");
+    expect(combined).toContain("Use `npx llm-wiki-skills` by default for CLI commands.");
+    expect(combined).toContain("npx llm-wiki-skills ingest plan");
+    expect(combined).toContain("npx llm-wiki-skills qmd reindex");
+    expect(combined).not.toContain("Run `llm-wiki-skills ingest plan");
     expect(combined).not.toContain("llm-wiki-skills graph");
     expect(combined).not.toContain("llm-wiki-skills lint");
     expect(combined).not.toContain("Review changed files");
@@ -794,6 +800,11 @@ if [ "$QMD_FAIL" = "$1" ]; then
   exit 2
 fi
 if [ "$1" = "embed" ]; then
+  if [ "$2" != "-c" ] || [ -z "$3" ] || [ "$4" != "--max-docs-per-batch" ] || [ "$5" != "8" ] || [ "$6" != "--max-batch-mb" ] || [ "$7" != "8" ]; then
+    echo "expected embed -c <collection> --max-docs-per-batch 8 --max-batch-mb 8" >&2
+    exit 2
+  fi
+  printf "embed-collection %s\\n" "$3" >> "$QMD_LOG"
   if [ "$QMD_EMBED_GPU_FAIL" = "1" ] && [ -z "$QMD_FORCE_CPU" ]; then
     echo "CUDA backend failed" >&2
     exit 2

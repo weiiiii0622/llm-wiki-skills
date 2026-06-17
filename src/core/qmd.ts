@@ -15,8 +15,11 @@ import { atomicWriteText, pathExists, stableJson } from "./fs.js";
 import { loadManifest, MANIFEST_PATH, requiredFileRegistry } from "./manifest.js";
 import { QMD_DOCS_PATH, QMD_MODEL_CACHE_PATH, QMD_MODELS, qmdCollectionName, qmdIntegrationMetadata } from "./qmd-metadata.js";
 import type { Manifest, ManifestIntegrations, QmdRuntimeMode, QmdSearchMode } from "./types.js";
+import { LLM_WIKI_CLI } from "./cli-command.js";
 
 const execFileAsync = promisify(execFile);
+const QMD_EMBED_MAX_DOCS_PER_BATCH = 8;
+const QMD_EMBED_MAX_BATCH_MB = 8;
 
 export interface QmdCommandResult {
   stdout: string;
@@ -82,9 +85,9 @@ Markdown remains the source of truth. Always read \`wiki/index.md\` first, then 
 
 ## Commands
 
-- Reindex after wiki changes: \`llm-wiki-skills qmd reindex\`
-- Check qmd readiness: \`llm-wiki-skills qmd status\`
-- Disable qmd metadata without deleting qmd data: \`llm-wiki-skills qmd disable\`
+- Reindex after wiki changes: \`${LLM_WIKI_CLI} qmd reindex\`
+- Check qmd readiness: \`${LLM_WIKI_CLI} qmd status\`
+- Disable qmd metadata without deleting qmd data: \`${LLM_WIKI_CLI} qmd disable\`
 
 ## Search Contract
 
@@ -137,7 +140,7 @@ export async function enableQmd(root: string, options: QmdEnableOptions = {}): P
   await addQmdCollection(runner, resolvedRoot, collection, runOptions);
   await runQmdStep(runner, resolvedRoot, ["update"], (message) => new QmdIndexUpdateError(message), "qmd", runOptions);
   const indexedAt = (options.now ?? new Date()).toISOString();
-  const semantic = await runQmdEmbed(runner, resolvedRoot, options, runOptions);
+  const semantic = await runQmdEmbed(runner, resolvedRoot, collection, options, runOptions);
 
   await atomicWriteText(resolvedRoot, QMD_DOCS_PATH, qmdDocsContent(collection, semantic.searchMode, semantic.runtimeMode));
   await writeQmdEnabledManifest(resolvedRoot, indexedAt, semantic, collection);
@@ -160,14 +163,14 @@ export async function reindexQmd(root: string, options: Pick<QmdEnableOptions, "
   const resolvedRoot = path.resolve(root);
   const manifest = await loadManifest(resolvedRoot);
   const qmd = manifest.integrations?.qmd;
-  if (!qmd?.enabled) throw new QmdCommandError("qmd is not enabled for this wiki. Run `llm-wiki-skills qmd enable` first.");
+  if (!qmd?.enabled) throw new QmdCommandError(`qmd is not enabled for this wiki. Run \`${LLM_WIKI_CLI} qmd enable\` first.`);
   const runner = options.runner ?? new ExecFileQmdRunner();
   const runOptions = commandDisplayOptions(options.showCommands);
   await runQmdStep(runner, resolvedRoot, ["update"], (message) => new QmdIndexUpdateError(message), "qmd", runOptions);
   const indexedAt = (options.now ?? new Date()).toISOString();
   const semantic = existingSemanticState(qmd);
   if (semantic.searchMode === "hybrid") {
-    await runQmdStep(runner, resolvedRoot, ["embed"], (message) => new QmdCommandError(message), "qmd", {
+    await runQmdStep(runner, resolvedRoot, qmdEmbedArgs(qmd.collection), (message) => new QmdCommandError(message), "qmd", {
       ...embedRunOptions(runOptions),
       ...(semantic.runtimeMode === "cpu-forced" ? { env: { QMD_FORCE_CPU: "1" } } : {})
     });
@@ -256,9 +259,9 @@ interface QmdSemanticState {
   searchMode: QmdSearchMode;
 }
 
-async function runQmdEmbed(runner: QmdRunner, root: string, options: QmdEnableOptions, runOptions: QmdRunOptions): Promise<QmdSemanticState> {
+async function runQmdEmbed(runner: QmdRunner, root: string, collection: string, options: QmdEnableOptions, runOptions: QmdRunOptions): Promise<QmdSemanticState> {
   try {
-    await runQmdStep(runner, root, ["embed"], (message) => new QmdCommandError(message), "qmd", embedRunOptions(runOptions));
+    await runQmdStep(runner, root, qmdEmbedArgs(collection), (message) => new QmdCommandError(message), "qmd", embedRunOptions(runOptions));
     return { searchMode: "hybrid", runtimeMode: "gpu-auto" };
   } catch (error) {
     if (!(error instanceof QmdCommandError)) throw error;
@@ -268,12 +271,24 @@ async function runQmdEmbed(runner: QmdRunner, root: string, options: QmdEnableOp
     if (choice === "keyword") {
       return { searchMode: "keyword", runtimeMode: "keyword-fallback", fallbackReason: error.message };
     }
-    await runQmdStep(runner, root, ["embed"], (message) => new QmdCommandError(message), "qmd", {
+    await runQmdStep(runner, root, qmdEmbedArgs(collection), (message) => new QmdCommandError(message), "qmd", {
       ...embedRunOptions(runOptions),
       env: { QMD_FORCE_CPU: "1" }
     });
     return { searchMode: "hybrid", runtimeMode: "cpu-forced" };
   }
+}
+
+function qmdEmbedArgs(collection: string): string[] {
+  return [
+    "embed",
+    "-c",
+    collection,
+    "--max-docs-per-batch",
+    String(QMD_EMBED_MAX_DOCS_PER_BATCH),
+    "--max-batch-mb",
+    String(QMD_EMBED_MAX_BATCH_MB)
+  ];
 }
 
 function embedRunOptions(options: QmdRunOptions): QmdRunOptions {

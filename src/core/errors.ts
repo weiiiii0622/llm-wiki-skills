@@ -22,7 +22,16 @@ export class LlmWikiError extends Error {
       | "QmdDoctorFailedError"
       | "QmdCollectionError"
       | "QmdIndexUpdateError"
-      | "QmdCommandError",
+      | "QmdCommandError"
+      | "IngestPlanMissingError"
+      | "IngestPlanAmbiguousError"
+      | "IngestPlanInvalidError"
+      | "IngestRawPathInvalidError"
+      | "IngestRawDriftError"
+      | "IngestInvalidTransitionError"
+      | "IngestValidationFailedError"
+      | "IngestSummaryMissingError"
+      | "IngestExtractorReportInvalidError",
     message: string,
     public readonly exitCode: number
   ) {
@@ -130,7 +139,7 @@ export class ManifestMismatchError extends LlmWikiError {
 }
 
 export class QmdNotInstalledError extends LlmWikiError {
-  constructor(message = "qmd is not installed. Install it with `npm install -g @tobilu/qmd` and then run `llm-wiki-skills qmd enable`.") {
+  constructor(message = "qmd is not installed. Install it with `npm install -g @tobilu/qmd` and then run `npx llm-wiki-skills qmd enable`.") {
     super("QmdNotInstalledError", message, 18);
   }
 }
@@ -162,5 +171,59 @@ export class QmdIndexUpdateError extends LlmWikiError {
 export class QmdCommandError extends LlmWikiError {
   constructor(message: string) {
     super("QmdCommandError", message, 23);
+  }
+}
+
+export class IngestPlanMissingError extends LlmWikiError {
+  constructor(message = "No active ingest plan found. Run `npx llm-wiki-skills ingest plan` first or pass --plan.") {
+    super("IngestPlanMissingError", message, 24);
+  }
+}
+
+export class IngestPlanAmbiguousError extends LlmWikiError {
+  constructor(message: string) {
+    super("IngestPlanAmbiguousError", message, 25);
+  }
+}
+
+export class IngestPlanInvalidError extends LlmWikiError {
+  constructor(message: string) {
+    super("IngestPlanInvalidError", message, 26);
+  }
+}
+
+export class IngestRawPathInvalidError extends LlmWikiError {
+  constructor(message: string) {
+    super("IngestRawPathInvalidError", message, 27);
+  }
+}
+
+export class IngestRawDriftError extends LlmWikiError {
+  constructor(message: string) {
+    super("IngestRawDriftError", message, 28);
+  }
+}
+
+export class IngestInvalidTransitionError extends LlmWikiError {
+  constructor(message: string) {
+    super("IngestInvalidTransitionError", message, 29);
+  }
+}
+
+export class IngestValidationFailedError extends LlmWikiError {
+  constructor(message: string) {
+    super("IngestValidationFailedError", message, 30);
+  }
+}
+
+export class IngestSummaryMissingError extends LlmWikiError {
+  constructor(message: string) {
+    super("IngestSummaryMissingError", message, 31);
+  }
+}
+
+export class IngestExtractorReportInvalidError extends LlmWikiError {
+  constructor(message: string) {
+    super("IngestExtractorReportInvalidError", message, 32);
   }
 }

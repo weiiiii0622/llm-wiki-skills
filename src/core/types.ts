@@ -11,6 +11,13 @@ export interface CommandOptions {
   obsidian?: boolean;
   qmd?: boolean;
   qmdAction?: "enable" | "disable" | "status" | "reindex";
+  ingestAction?: "plan" | "status" | "mark" | "validate" | "import-extractors";
+  ingestRawRoots?: string[];
+  ingestPlanId?: string;
+  ingestSource?: string;
+  ingestStatus?: "summarized" | "merged" | "skipped" | "deferred";
+  ingestReason?: string;
+  ingestFile?: string;
   hosts: HostId[];
   topicValues: string[];
   templateValues: string[];

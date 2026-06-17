@@ -1,4 +1,6 @@
 import type { HostAdapter } from "../core/types.js";
+import { MULTI_FILE_INGEST_PROTOCOL } from "../core/ingest-protocol.js";
+import { LLM_WIKI_CLI } from "../core/cli-command.js";
 import { QMD_QUERY_WORKFLOW_STEP } from "./qmd-instructions.js";
 
 export function claudeCodeAdapter(): HostAdapter {
@@ -36,8 +38,10 @@ Use this skill when adding source material to a local LLM wiki vault.
 4. Extract reusable topics, entities, concepts, claims, examples, contradictions, and questions.
 5. Route related pages into the most specific \`wiki/\` category from \`docs/llm-wiki-routing.md\`; fall back to \`wiki/topics/\`, \`wiki/entities/\`, \`wiki/concepts/\`, and \`wiki/questions/\` only when no topic routing guide exists.
 6. Update \`wiki/index.md\` and \`wiki/log.md\`.
-7. If \`.llm-wiki-skills.json\` has \`integrations.qmd.enabled\`, run \`llm-wiki-skills qmd reindex\` once after all wiki writes.
+7. If \`.llm-wiki-skills.json\` has \`integrations.qmd.enabled\`, run \`${LLM_WIKI_CLI} qmd reindex\` once after all wiki writes.
 8. Use the \`llm-wiki-lint\` skill to health-check the wiki.
+
+${MULTI_FILE_INGEST_PROTOCOL}
 `
       },
       {
