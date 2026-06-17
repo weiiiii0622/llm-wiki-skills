@@ -37,10 +37,11 @@ AI agents are useful until they forget the context you gave them last week. `llm
 - **Source-grounded:** raw evidence and synthesized wiki pages stay separate.
 - **Topic-aware:** choose a scaffold for research, product work, trips, investing, medical notes, legal/admin records, and more.
 - **Obsidian-ready:** generated vault metadata works with Obsidian's native graph view.
-- **Search-upgradable:** optional `qmd` support adds local SQLite-backed hybrid search while markdown remains the source of truth.
+- **QMD search:** optional `qmd` support adds local SQLite-backed hybrid search while markdown remains the source of truth.
 
 ## Getting Started
 
+### 1. `npx` (Recomended)
 Run the setup wizard in any repo or markdown workspace:
 
 ```sh
@@ -52,8 +53,27 @@ The wizard asks which agent host to install, which topic scaffold to use, and wh
 For a non-interactive Codex setup:
 
 ```sh
-npx llm-wiki-skills init --host codex --topic work-project --quiet
+npx llm-wiki-skills init --host codex --topic product-builder
 ```
+
+Common flags:
+
+| Flag | Use it when |
+| --- | --- |
+| `--host codex` | Install Codex repo skills under `.agents/skills/`. |
+| `--host claude-code` | Install Claude Code project skills under `.claude/skills/`. |
+| `--topic work-project` | Add topic directories and routing guidance. |
+| `--obsidian` / `--no-obsidian` | Enable or skip Obsidian vault metadata. |
+| `--qmd` | Add optional local qmd search support. |
+| `--json` / `--quiet` | Use in scripts or CI. |
+
+### 2. Global `npm` install:
+
+```sh
+npm install -g llm-wiki-skills
+llm-wiki-skills init
+```
+
 
 Then check the install:
 
@@ -62,7 +82,7 @@ npx llm-wiki-skills status
 ```
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/weiiiii0622/llm-wiki-skills/main/media/llm-wiki-skills-installation.gif" alt="Installing llm-wiki-skills and creating a local wiki vault" width="760">
+  <img src="https://raw.githubusercontent.com/weiiiii0622/llm-wiki-skills/main/media/llm-wiki-skills-installation.gif" alt="Installing llm-wiki-skills and creating a local wiki vault">
 </p>
 
 ## Installation
