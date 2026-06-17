@@ -82,7 +82,7 @@ npx llm-wiki-skills status
 ```
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/weiiiii0622/llm-wiki-skills/main/media/llm-wiki-skills-installation.gif" alt="Installing llm-wiki-skills and creating a local wiki vault">
+  <img src="https://raw.githubusercontent.com/weiiiii0622/llm-wiki-skills/main/media/llm-wiki-skills-installation.gif" alt="Installing llm-wiki-skills and creating a local wiki vault" width="720">
 </p>
 
 ## Installation
