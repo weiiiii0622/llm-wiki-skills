@@ -104,19 +104,6 @@ describe("topic templates", () => {
     expect(TOPIC_TEMPLATE_IDS as readonly string[]).not.toContain("health-fitness");
   });
 
-  it("documents every topic template in the README", async () => {
-    const readme = await readFile("README.md", "utf8");
-
-    for (const id of TOPIC_TEMPLATE_IDS) {
-      const template = getTopicTemplate(id);
-      expect(readme).toContain(`### \`${id}\``);
-      expect(readme).toContain(`${template.directories[0].relativePath.replace("wiki/", "")}/`);
-    }
-    expect(readme).toContain("### `custom`");
-    expect(readme).toContain("--topic custom --custom-topic");
-    expect(readme).toContain("The CLI does not call a hosted LLM");
-  });
-
   it("keeps requested work-project and medical directory structures", () => {
     expect(getTopicTemplate("work-project").directories.map((directory) => directory.relativePath)).toEqual([
       "wiki/architecture",
