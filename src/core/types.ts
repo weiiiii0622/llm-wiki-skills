@@ -11,6 +11,9 @@ export interface CommandOptions {
   obsidian?: boolean;
   qmd?: boolean;
   qmdAction?: "enable" | "disable" | "status" | "reindex";
+  webAction?: "build" | "serve";
+  webOut?: string;
+  webPort?: number;
   ingestAction?: "plan" | "status" | "mark" | "validate" | "import-extractors";
   ingestRawRoots?: string[];
   ingestPlanId?: string;

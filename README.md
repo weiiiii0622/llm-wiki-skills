@@ -7,7 +7,7 @@
 <p align="center">
   Local-first wiki skills for Codex and Claude Code.
   <br>
-  Turn scattered project notes into a durable, source-grounded knowledge vault your agent can maintain.
+  Turn scattered project notes into a durable, source-grounded knowledge vault your agent can maintain and browse on the web.
 </p>
 
 <p align="center">
@@ -30,13 +30,14 @@ AI agents are useful until they forget the context you gave them last week. `llm
 | Every session starts with "read these files again." | Codex or Claude Code can ingest, query, and lint the same local vault. |
 | Search depends on whatever the model happens to load. | Markdown stays canonical, with optional local qmd search acceleration. |
 
-## What Makes It Different
+## Key Features
 
 - **Agent-native:** installs skills for Codex and Claude Code, not just docs for humans.
 - **Local-first:** no hosted memory service, no remote database, no required account.
 - **Source-grounded:** raw evidence and synthesized wiki pages stay separate.
 - **Topic-aware:** choose a scaffold for research, product work, trips, investing, medical notes, legal/admin records, and more.
-- **Obsidian-ready:** generated vault metadata works with Obsidian's native graph view.
+- **Web-only graph atlas:** visualize, search, and read your wiki in a browser. Obsidian is optional, not required.
+- **Static deploy:** export the atlas as plain web assets for GitHub Pages, Netlify, Vercel, or any static host.
 - **QMD search:** optional `qmd` support adds local SQLite-backed hybrid search while markdown remains the source of truth.
 
 ## Getting Started
@@ -103,6 +104,7 @@ Requirements:
 
 - Node.js 22 or newer.
 - Codex or Claude Code if you want an agent to use the generated skills.
+- Obsidian is optional. The web UI can visualize the wiki by itself.
 - A project folder or markdown vault where local files can be created.
 
 #### Non-interactive installation supported
@@ -142,6 +144,34 @@ Cite the wiki pages you used.
 Use the llm-wiki-lint skill. Find stale claims, contradictions,
 or missing cross-references before handoff.
 ```
+
+### Open or Deploy the Web UI
+
+The web UI is web-only: it lets you inspect the wiki graph in a browser and does not require Obsidian.
+
+Run locally:
+
+```sh
+npx llm-wiki-skills web serve --root .
+```
+
+By default this serves the atlas at `http://127.0.0.1:3678/`. Assign a custom port when needed:
+
+```sh
+npx llm-wiki-skills web serve --root . --port 4000
+```
+
+Build for remote deploy:
+
+```sh
+npx llm-wiki-skills web build --root . --out dist/atlas
+```
+
+Then upload `dist/atlas` to any static web host. The export includes the graph, search index, page content, and diagnostics needed by the browser UI.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/weiiiii0622/llm-wiki-skills/main/media/llm-wiki-skills-webui.png" alt="llm-wiki-skills web UI" width="720">
+</p>
 
 ### Plan Larger Ingests
 
@@ -235,5 +265,5 @@ Markdown under `wiki/` remains canonical. qmd is only used for local candidate d
 | --- | --- |
 | A local installer for agent wiki workflows. | A hosted memory service. |
 | A way to keep raw evidence and durable knowledge organized. | A replacement for reviewing source material. |
-| A bridge between markdown vaults, Codex, Claude Code, and Obsidian. | A full note-taking app or automatic importer. |
+| A bridge between markdown vaults, Codex, Claude Code, the web atlas, and optional Obsidian. | A full note-taking app or automatic importer. |
 | Optional local search acceleration through qmd. | A required cloud search backend. |

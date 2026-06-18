@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Graph Atlas</title>
+    <link rel="stylesheet" href="assets/app.css" />
+  </head>
+  <body>
+    <div id="app" class="app-shell loading">
+      <header class="top-strip" aria-label="Atlas status">
+        <div>
+          <div class="atlas-title" id="atlas-title">Graph Atlas</div>
+          <div class="status-line" id="atlas-status">Loading atlas data</div>
+        </div>
+        <div class="strip-actions">
+          <span class="mode-badge" id="search-mode">text search</span>
+          <button class="icon-button" id="share-button" type="button" title="Copy current view">Share</button>
+        </div>
+      </header>
+
+      <nav class="utility-rail" id="utility-rail" aria-label="Atlas controls">
+        <div class="panel-titlebar utility-titlebar">
+          <div>
+            <div class="panel-kicker">Atlas panel</div>
+            <h2>Controls</h2>
+          </div>
+          <button class="panel-collapse-button collapse-left" id="toggle-left" type="button" aria-controls="utility-rail" aria-expanded="true" title="Collapse controls panel"></button>
+        </div>
+        <section class="control-section search-section" aria-labelledby="search-heading">
+          <h2 id="search-heading">Search</h2>
+          <label class="search-box">
+            <span aria-hidden="true">Search</span>
+            <input id="search-input" type="search" autocomplete="off" placeholder="Find a note" />
+          </label>
+          <div class="search-state" id="search-state">Type to search titles and content.</div>
+          <div class="result-list" id="result-list" role="listbox" aria-label="Search results"></div>
+        </section>
+
+        <section class="control-section" aria-labelledby="filter-heading">
+          <div class="section-heading">
+            <h2 id="filter-heading">Filters</h2>
+            <button class="text-button" id="clear-filters" type="button">Clear</button>
+          </div>
+          <div id="filter-list" class="filter-list"></div>
+        </section>
+
+        <section class="control-section" aria-labelledby="health-heading">
+          <h2 id="health-heading">Health</h2>
+          <div id="health-legend" class="health-legend">Loading diagnostics</div>
+        </section>
+
+        <section class="control-section" aria-labelledby="focus-heading">
+          <h2 id="focus-heading">Focus</h2>
+          <label class="depth-control">
+            <span>Depth</span>
+            <select id="focus-depth">
+              <option value="0">Off</option>
+              <option value="1">1 hop</option>
+              <option value="2">2 hops</option>
+              <option value="3">3 hops</option>
+            </select>
+          </label>
+          <button class="text-button" id="reset-focus" type="button">Reset focus</button>
+        </section>
+      </nav>
+
+      <main class="graph-region" aria-label="Graph workspace">
+        <div class="graph-toolbar" aria-label="Graph tools">
+          <button class="icon-button" id="zoom-in" type="button" title="Zoom in">+</button>
+          <button class="icon-button" id="zoom-out" type="button" title="Zoom out">-</button>
+          <button class="icon-button" id="fit-graph" type="button" title="Fit graph">Fit</button>
+        </div>
+        <button class="panel-edge-toggle edge-left-toggle" id="show-left" type="button" aria-controls="utility-rail" aria-expanded="false">Controls</button>
+        <button class="panel-edge-toggle edge-reader-toggle" id="show-reader" type="button" aria-controls="reader-panel" aria-expanded="false">Reader</button>
+        <button class="panel-edge-toggle edge-nodes-toggle" id="show-nodes" type="button" aria-controls="node-list-panel" aria-expanded="false">Nodes</button>
+        <canvas id="graph-canvas" aria-label="Graph canvas" tabindex="0"></canvas>
+        <div class="graph-message" id="graph-message" role="status">Loading graph</div>
+        <section class="node-list-panel" id="node-list-panel" aria-labelledby="node-list-heading">
+          <div class="panel-titlebar node-titlebar">
+            <h2 id="node-list-heading">Nodes</h2>
+            <button class="panel-collapse-button collapse-down" id="toggle-nodes" type="button" aria-controls="node-list-panel" aria-expanded="true" title="Collapse node list"></button>
+          </div>
+          <div id="node-list" class="node-list"></div>
+        </section>
+      </main>
+
+      <aside class="reader-panel" id="reader-panel" aria-label="Selected note">
+        <div class="reader-header">
+          <div>
+            <div class="panel-kicker">Selected note</div>
+            <h1 id="reader-title">Select a node</h1>
+          </div>
+          <button class="panel-collapse-button collapse-right" id="toggle-reader" type="button" aria-controls="reader-panel" aria-expanded="true" title="Collapse reader panel"></button>
+        </div>
+        <div id="reader-meta" class="metadata-row"></div>
+        <article id="reader-content" class="reader-content">
+          <p class="empty-copy">Select a graph node or search result.</p>
+        </article>
+        <div id="reader-links" class="reader-links"></div>
+      </aside>
+    </div>
+    <script type="module" src="assets/app.js"></script>
+  </body>
+</html>

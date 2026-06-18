@@ -4,12 +4,13 @@ import path from "node:path";
 import { initCommand } from "./commands/init.js";
 import { qmdCommand } from "./commands/qmd.js";
 import { ingestCommand } from "./commands/ingest.js";
+import { webCommand } from "./commands/web.js";
 import { statusCommand } from "./commands/status.js";
 import { ConflictingObsidianOptionError, ConflictingQmdOptionError, LlmWikiError } from "../core/errors.js";
 import { parseHostValues } from "../core/hosts.js";
 import type { CommandOptions } from "../core/types.js";
 
-const COMMANDS = new Set(["init", "status", "qmd", "ingest"]);
+const COMMANDS = new Set(["init", "status", "qmd", "ingest", "web"]);
 
 async function main(argv: string[]): Promise<void> {
   const { command, options } = parseCommand(argv);
@@ -25,6 +26,9 @@ async function main(argv: string[]): Promise<void> {
       return;
     case "ingest":
       await ingestCommand(options);
+      return;
+    case "web":
+      await webCommand(options);
       return;
     default:
       usage();
@@ -42,6 +46,7 @@ export function parseCommand(argv: string[]): { command: string; options: Comman
   if (!COMMANDS.has(command)) return { command, options: defaults() };
   if (command === "qmd") return { command, options: parseQmdOptions(args) };
   if (command === "ingest") return { command, options: parseIngestOptions(args) };
+  if (command === "web") return { command, options: parseWebOptions(args) };
   if (command === "status") return { command, options: parseStatusOptions(args) };
   return { command, options: parseInitOptions(args) };
 }
@@ -203,6 +208,42 @@ function parseIngestOptions(args: string[]): CommandOptions {
   return options;
 }
 
+function parseWebOptions(args: string[]): CommandOptions {
+  const options = defaults();
+  const action = args.shift();
+  if (action !== "build" && action !== "serve") {
+    throw new Error("web requires one of: build, serve");
+  }
+  options.webAction = action;
+  while (args.length > 0) {
+    const arg = args.shift();
+    if (arg === "--root") {
+      const value = args.shift();
+      if (!value) throw new Error("--root requires a path");
+      options.root = value;
+    } else if (arg === "--out") {
+      const value = args.shift();
+      if (!value) throw new Error("--out requires a path");
+      options.webOut = value;
+    } else if (arg === "--port") {
+      const value = args.shift();
+      if (!value) throw new Error("--port requires a number");
+      const port = Number(value);
+      if (!Number.isInteger(port) || port < 0 || port > 65_535) throw new Error("--port requires a number from 0 to 65535");
+      options.webPort = port;
+    } else if (arg === "--json") {
+      options.json = true;
+    } else if (arg === "--debug") {
+      options.debug = true;
+    } else if (arg === "--quiet") {
+      options.quiet = true;
+    } else {
+      throw new Error(`Unknown option: ${arg}`);
+    }
+  }
+  return options;
+}
+
 function defaults(): CommandOptions {
   return {
     root: process.cwd(),
@@ -226,6 +267,8 @@ Usage:
   llm-wiki-skills init [--root DIR] [--host codex|claude-code] [--topic ID] [--obsidian|--no-obsidian] [--qmd|--no-qmd] [--json] [--quiet]
   llm-wiki-skills status [--root DIR] [--json] [--quiet]
   llm-wiki-skills qmd enable|disable|status|reindex [--root DIR] [--json] [--quiet]
+  llm-wiki-skills web build --root DIR --out DIR [--json] [--quiet]
+  llm-wiki-skills web serve --root DIR [--port PORT] [--out DIR] [--json] [--quiet]  # default port: 3678
   llm-wiki-skills ingest plan [--root DIR] [--raw raw/sources] [--json] [--quiet]
   llm-wiki-skills ingest status|validate [--root DIR] [--plan PLAN_ID] [--json] [--quiet]
   llm-wiki-skills ingest mark [--root DIR] [--plan PLAN_ID] --source raw/sources/file.md --status summarized|merged|skipped|deferred [--reason TEXT] [--json] [--quiet]
