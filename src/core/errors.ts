@@ -31,7 +31,13 @@ export class LlmWikiError extends Error {
       | "IngestInvalidTransitionError"
       | "IngestValidationFailedError"
       | "IngestSummaryMissingError"
-      | "IngestExtractorReportInvalidError",
+      | "IngestExtractorReportInvalidError"
+      | "IngestMarkerMissingError"
+      | "IngestConversionTimeoutError"
+      | "IngestConversionFailedError"
+      | "IngestConversionMissingOutputError"
+      | "IngestConversionUnsupportedFileError"
+      | "IngestConversionUnsafeOutputError",
     message: string,
     public readonly exitCode: number
   ) {
@@ -225,5 +231,41 @@ export class IngestSummaryMissingError extends LlmWikiError {
 export class IngestExtractorReportInvalidError extends LlmWikiError {
   constructor(message: string) {
     super("IngestExtractorReportInvalidError", message, 32);
+  }
+}
+
+export class IngestMarkerMissingError extends LlmWikiError {
+  constructor(message = "Marker is not installed. Install Marker separately, then rerun `npx llm-wiki-skills ingest plan`.") {
+    super("IngestMarkerMissingError", message, 33);
+  }
+}
+
+export class IngestConversionTimeoutError extends LlmWikiError {
+  constructor(message: string) {
+    super("IngestConversionTimeoutError", message, 34);
+  }
+}
+
+export class IngestConversionFailedError extends LlmWikiError {
+  constructor(message: string) {
+    super("IngestConversionFailedError", message, 35);
+  }
+}
+
+export class IngestConversionMissingOutputError extends LlmWikiError {
+  constructor(message: string) {
+    super("IngestConversionMissingOutputError", message, 36);
+  }
+}
+
+export class IngestConversionUnsupportedFileError extends LlmWikiError {
+  constructor(message: string) {
+    super("IngestConversionUnsupportedFileError", message, 37);
+  }
+}
+
+export class IngestConversionUnsafeOutputError extends LlmWikiError {
+  constructor(message: string) {
+    super("IngestConversionUnsafeOutputError", message, 38);
   }
 }

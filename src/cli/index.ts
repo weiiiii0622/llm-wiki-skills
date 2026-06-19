@@ -158,11 +158,18 @@ function parseQmdOptions(args: string[]): CommandOptions {
 function parseIngestOptions(args: string[]): CommandOptions {
   const options = defaults();
   const action = args.shift();
-  if (action !== "plan" && action !== "status" && action !== "mark" && action !== "validate" && action !== "import-extractors") {
-    throw new Error("ingest requires one of: plan, status, mark, validate, import-extractors");
+  if (action === "converters") {
+    const convertersAction = args.shift();
+    if (convertersAction !== "status") throw new Error("ingest converters requires: status");
+    options.ingestAction = "converters-status";
+  } else if (action !== "plan" && action !== "status" && action !== "mark" && action !== "validate" && action !== "import-extractors") {
+    throw new Error("ingest requires one of: plan, status, mark, validate, import-extractors, converters status");
+  } else {
+    options.ingestAction = action;
   }
-  options.ingestAction = action;
   options.ingestRawRoots = [];
+  let convertEnabled = false;
+  let convertDisabled = false;
   while (args.length > 0) {
     const arg = args.shift();
     if (arg === "--root") {
@@ -195,6 +202,22 @@ function parseIngestOptions(args: string[]): CommandOptions {
       const value = args.shift();
       if (!value) throw new Error("--file requires a path");
       options.ingestFile = value;
+    } else if (arg === "--convert") {
+      convertEnabled = true;
+      options.ingestConvert = true;
+    } else if (arg === "--no-convert") {
+      convertDisabled = true;
+      options.ingestConvert = false;
+    } else if (arg === "--converter") {
+      const value = args.shift();
+      if (value !== "marker") throw new Error("--converter requires: marker");
+      options.ingestConverter = value;
+    } else if (arg === "--conversion-workers") {
+      options.ingestConversionWorkers = parsePositiveInteger(args.shift(), "--conversion-workers");
+    } else if (arg === "--conversion-timeout-ms") {
+      options.ingestConversionTimeoutMs = parsePositiveInteger(args.shift(), "--conversion-timeout-ms");
+    } else if (arg === "--conversion-max-mb") {
+      options.ingestConversionMaxMb = parsePositiveInteger(args.shift(), "--conversion-max-mb");
     } else if (arg === "--json") {
       options.json = true;
     } else if (arg === "--debug") {
@@ -205,7 +228,22 @@ function parseIngestOptions(args: string[]): CommandOptions {
       throw new Error(`Unknown option: ${arg}`);
     }
   }
+  if (convertEnabled && convertDisabled) throw new Error("Conflicting conversion options: use either --convert or --no-convert, not both.");
+  if (options.ingestAction !== "plan") {
+    if (options.ingestConvert !== undefined) throw new Error("--convert and --no-convert only apply to ingest plan.");
+    if (options.ingestConverter !== undefined) throw new Error("--converter only applies to ingest plan.");
+    if (options.ingestConversionWorkers !== undefined) throw new Error("--conversion-workers only applies to ingest plan.");
+    if (options.ingestConversionTimeoutMs !== undefined) throw new Error("--conversion-timeout-ms only applies to ingest plan.");
+    if (options.ingestConversionMaxMb !== undefined) throw new Error("--conversion-max-mb only applies to ingest plan.");
+  }
   return options;
+}
+
+function parsePositiveInteger(value: string | undefined, label: string): number {
+  if (!value) throw new Error(`${label} requires a number`);
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) throw new Error(`${label} requires a positive integer`);
+  return parsed;
 }
 
 function parseWebOptions(args: string[]): CommandOptions {
@@ -269,7 +307,8 @@ Usage:
   llm-wiki-skills qmd enable|disable|status|reindex [--root DIR] [--json] [--quiet]
   llm-wiki-skills web build --root DIR --out DIR [--json] [--quiet]
   llm-wiki-skills web serve --root DIR [--port PORT] [--out DIR] [--json] [--quiet]  # default port: 3678
-  llm-wiki-skills ingest plan [--root DIR] [--raw raw/sources] [--json] [--quiet]
+  llm-wiki-skills ingest plan [--root DIR] [--raw raw/sources] [--convert|--no-convert] [--converter marker] [--conversion-workers N] [--conversion-timeout-ms N] [--conversion-max-mb N] [--json] [--quiet]
+  llm-wiki-skills ingest converters status [--root DIR] [--json] [--quiet]
   llm-wiki-skills ingest status|validate [--root DIR] [--plan PLAN_ID] [--json] [--quiet]
   llm-wiki-skills ingest mark [--root DIR] [--plan PLAN_ID] --source raw/sources/file.md --status summarized|merged|skipped|deferred [--reason TEXT] [--json] [--quiet]
   llm-wiki-skills ingest import-extractors [--root DIR] [--plan PLAN_ID] --file report.json [--json] [--quiet]

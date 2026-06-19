@@ -1,10 +1,16 @@
 import { createHash } from "node:crypto";
 import { createReadStream, statSync } from "node:fs";
-import { lstat, mkdir, readdir, stat } from "node:fs/promises";
+import { lstat, mkdir, readdir, rename } from "node:fs/promises";
 import path from "node:path";
 import {
+  IngestConversionFailedError,
+  IngestConversionMissingOutputError,
+  IngestConversionTimeoutError,
+  IngestConversionUnsafeOutputError,
+  IngestConversionUnsupportedFileError,
   IngestExtractorReportInvalidError,
   IngestInvalidTransitionError,
+  IngestMarkerMissingError,
   IngestPlanAmbiguousError,
   IngestPlanInvalidError,
   IngestPlanMissingError,
@@ -16,10 +22,23 @@ import {
 import { atomicWriteText, listMarkdownFiles, pathExists, readText, stableJson } from "../fs.js";
 import { assertVault } from "../vault-contract.js";
 import { normalizeRoot, toPosixPath } from "../path-guard.js";
+import {
+  conversionPathIsInsideConvertedDir,
+  convertSourceWithMarker,
+  defaultConversionOptions,
+  isMarkerConvertibleExtension,
+  markerProviderStatus,
+  type ConversionFields,
+  type ConversionOptions,
+  type ConversionStatus
+} from "./converters.js";
 
 export const DEFAULT_RAW_ROOTS = ["raw/sources", "raw/notes"] as const;
-export const INGEST_PLAN_DIR = "wiki/ingest-plans";
-export const INGEST_SCHEMA_VERSION = 1;
+export const INGEST_ARCHIVE_DIR = "raw/archieved";
+export const INGEST_PLAN_DIR = ".llm-wiki-skills/ingest-plans";
+export const INGEST_SCHEMA_VERSION = 2;
+const INGEST_EXTRACTOR_REPORT_SCHEMA_VERSION = 1;
+const LEGACY_INGEST_PLAN_DIR = "wiki/ingest-plans";
 
 const BATCH_TARGET_TOKENS = 12000;
 const BATCH_MAX_FILES = 12;
@@ -41,7 +60,7 @@ export interface IngestExtractorMetadata {
   batchHints?: string[];
 }
 
-export interface IngestSource {
+export interface IngestSource extends ConversionFields {
   id: string;
   rawPath: string;
   sizeBytes: number;
@@ -52,6 +71,7 @@ export interface IngestSource {
   extractorMetadata?: IngestExtractorMetadata;
   status: IngestSourceStatus;
   expectedSummaryPath: string;
+  archivedRawPath?: string;
   reason?: string;
   lastMarkedAt?: string;
 }
@@ -77,7 +97,7 @@ export interface IngestSummaryCounts {
 }
 
 export interface IngestPlanSidecar {
-  schemaVersion: 1;
+  schemaVersion: 2;
   planId: string;
   planStatus: IngestPlanStatus;
   createdAt: string;
@@ -123,22 +143,33 @@ interface RawInventoryEntry {
   contentKind: IngestContentKind;
 }
 
-export async function createIngestPlan(rootInput: string, rawRootsInput: string[] = []): Promise<IngestCommandResult> {
+export async function createIngestPlan(rootInput: string, rawRootsInput: string[] = [], conversionInput: Partial<ConversionOptions> = {}): Promise<IngestCommandResult> {
   const root = normalizeRoot(rootInput);
   await assertVault(root);
   const now = currentIso();
   const rawRoots = normalizeRawRoots(root, rawRootsInput.length > 0 ? rawRootsInput : [...DEFAULT_RAW_ROOTS]);
   const inventory = await listRawEvidenceFiles(root, rawRoots);
   const summaryPaths = expectedSummaryPaths(inventory);
-  const sources = inventory.map((entry, index) => ({
-    id: `src-${String(index + 1).padStart(4, "0")}`,
-    ...entry,
-    status: "planned" as const,
-    expectedSummaryPath: summaryPaths.get(entry.rawPath) ?? summaryPathForSlug(baseSourceSlug(entry.rawPath), entry.sha256)
-  }));
+  const planId = await makePlanId(root, now);
+  const conversionOptions = defaultConversionOptions(conversionInput);
+  const markerStatus =
+    conversionOptions.enabled && inventory.some((entry) => isMarkerConvertibleExtension(entry.extension)) ? await markerProviderStatus() : undefined;
+  const sources: IngestSource[] = [];
+  for (const [index, entry] of inventory.entries()) {
+    const source = {
+      id: `src-${String(index + 1).padStart(4, "0")}`,
+      ...entry,
+      status: "planned" as const,
+      expectedSummaryPath: summaryPaths.get(entry.rawPath) ?? summaryPathForSlug(baseSourceSlug(entry.rawPath), entry.sha256)
+    };
+    sources.push({
+      ...source,
+      ...(await convertSourceWithMarker({ root, planId, source, options: conversionOptions, markerStatus }))
+    });
+  }
   const plan: IngestPlanSidecar = {
     schemaVersion: INGEST_SCHEMA_VERSION,
-    planId: await makePlanId(root, now),
+    planId,
     planStatus: "active",
     createdAt: now,
     updatedAt: now,
@@ -157,9 +188,10 @@ export async function getIngestStatus(rootInput: string, planId?: string): Promi
   const root = normalizeRoot(rootInput);
   await assertVault(root);
   const plan = await loadPlan(root, planId);
+  const archived = await archiveMergedRawSources(root, plan);
   const drifted = await markDriftedSources(root, plan);
   plan.summaryCounts = summarize(plan.sources, root, plan.summaryCounts.validationFailures);
-  if (drifted) {
+  if (archived || drifted) {
     plan.updatedAt = currentIso();
     await writePlan(root, plan);
     await writeMarkdownPlan(root, plan);
@@ -192,6 +224,9 @@ export async function markIngestSource(rootInput: string, options: { planId?: st
   source.lastMarkedAt = now;
   if (reason) source.reason = reason;
   if (options.status === "summarized" || options.status === "merged") delete source.reason;
+  if (options.status === "merged") {
+    source.archivedRawPath = await archiveRawSource(root, source);
+  }
   plan.updatedAt = now;
   plan.summaryCounts = summarize(plan.sources, root);
   await writePlan(root, plan);
@@ -235,6 +270,7 @@ export async function validateIngestPlan(rootInput: string, planId?: string): Pr
   const root = normalizeRoot(rootInput);
   await assertVault(root);
   const plan = await loadPlan(root, planId);
+  await archiveMergedRawSources(root, plan);
   const failures: string[] = [];
   let missingSummary = false;
   let drifted = false;
@@ -243,8 +279,8 @@ export async function validateIngestPlan(rootInput: string, planId?: string): Pr
       if (!source.reason?.trim()) failures.push(`${source.rawPath} is ${source.status} without a reason.`);
       continue;
     }
-    const fullRawPath = path.join(root, source.rawPath);
-    if (!(await pathExists(fullRawPath))) {
+    const fullRawPath = await sourceStoragePath(root, source);
+    if (!fullRawPath) {
       failures.push(`${source.rawPath} is missing from raw evidence.`);
       continue;
     }
@@ -254,6 +290,7 @@ export async function validateIngestPlan(rootInput: string, planId?: string): Pr
       drifted = true;
       failures.push(`${source.rawPath} hash changed since planning.`);
     }
+    failures.push(...(await validateSourceConversion(root, plan, source)));
     if (FINAL_INCOMPLETE_STATUSES.has(source.status)) {
       failures.push(`${source.rawPath} is still ${source.status}.`);
     }
@@ -283,6 +320,8 @@ export async function validateIngestPlan(rootInput: string, planId?: string): Pr
   await writeMarkdownPlan(root, plan);
   if (drifted) throw new IngestRawDriftError(failures.join("\n"));
   if (missingSummary) throw new IngestSummaryMissingError(failures.join("\n"));
+  const conversionError = conversionValidationError(plan, failures);
+  if (conversionError) throw conversionError;
   if (failures.length > 0) throw new IngestValidationFailedError(failures.join("\n"));
   return result(root, plan, failures);
 }
@@ -324,6 +363,7 @@ async function walkRaw(root: string, current: string, found: RawInventoryEntry[]
     const absolute = path.join(current, entry.name);
     const entryStat = await lstat(absolute);
     const relative = toPosixPath(path.relative(root, absolute));
+    if (relative === INGEST_ARCHIVE_DIR || relative.startsWith(`${INGEST_ARCHIVE_DIR}/`)) continue;
     if (entryStat.isSymbolicLink()) {
       throw new IngestRawPathInvalidError(`Refusing to scan symlinked raw path: ${relative}`);
     }
@@ -375,8 +415,10 @@ async function archiveActivePlans(root: string): Promise<void> {
 
 async function readPlan(root: string, planId: string): Promise<IngestPlanSidecar> {
   const file = path.join(root, INGEST_PLAN_DIR, `${planId}.json`);
-  if (!(await pathExists(file))) throw new IngestPlanMissingError(`Ingest plan not found: ${planId}`);
-  return validatePlanSidecar(await readJsonFile(file), planId);
+  const legacyFile = path.join(root, LEGACY_INGEST_PLAN_DIR, `${planId}.json`);
+  const readableFile = (await pathExists(file)) ? file : (await pathExists(legacyFile)) ? legacyFile : undefined;
+  if (!readableFile) throw new IngestPlanMissingError(`Ingest plan not found: ${planId}`);
+  return validatePlanSidecar(await readJsonFile(readableFile), planId);
 }
 
 async function readJsonFile(file: string): Promise<unknown> {
@@ -400,12 +442,13 @@ async function readExtractorJsonFile(file: string): Promise<unknown> {
 function validatePlanSidecar(value: unknown, expectedPlanId?: string): IngestPlanSidecar {
   try {
     const object = requireObject(value, "ingest plan");
-    if (object.schemaVersion !== INGEST_SCHEMA_VERSION) throw new Error("Unsupported ingest plan schemaVersion.");
+    const schemaVersion = object.schemaVersion;
+    if (schemaVersion !== 1 && schemaVersion !== INGEST_SCHEMA_VERSION) throw new Error("Unsupported ingest plan schemaVersion.");
     const planId = requireString(object.planId, "planId");
     if (expectedPlanId && planId !== expectedPlanId) throw new Error(`Plan id mismatch: expected ${expectedPlanId}, found ${planId}.`);
     const planStatus = requireEnum(object.planStatus, ["active", "validated", "archived"], "planStatus");
     const sourcesValue = requireArray(object.sources, "sources");
-    const sources = sourcesValue.map(validateSource);
+    const sources = sourcesValue.map((source, index) => validateSource(source, index, schemaVersion));
     return {
       schemaVersion: INGEST_SCHEMA_VERSION,
       planId,
@@ -424,8 +467,10 @@ function validatePlanSidecar(value: unknown, expectedPlanId?: string): IngestPla
   }
 }
 
-function validateSource(value: unknown, index: number): IngestSource {
+function validateSource(value: unknown, index: number, schemaVersion: unknown): IngestSource {
   const object = requireObject(value, `sources[${index}]`);
+  const conversionStatus =
+    schemaVersion === 1 ? "not-needed" : requireEnum(object.conversionStatus, conversionStatuses, `sources[${index}].conversionStatus`);
   return {
     id: requireString(object.id, `sources[${index}].id`),
     rawPath: requireString(object.rawPath, `sources[${index}].rawPath`),
@@ -436,6 +481,21 @@ function validateSource(value: unknown, index: number): IngestSource {
     contentKind: requireEnum(object.contentKind, ["markdown", "text", "unknown"], `sources[${index}].contentKind`),
     status: requireEnum(object.status, ["planned", "summarized", "merged", "skipped", "deferred", "changed"], `sources[${index}].status`),
     expectedSummaryPath: requireString(object.expectedSummaryPath, `sources[${index}].expectedSummaryPath`),
+    ...(object.archivedRawPath === undefined ? {} : { archivedRawPath: validateArchivedRawPath(object.archivedRawPath, `sources[${index}].archivedRawPath`) }),
+    conversionStatus,
+    ...(object.convertedMarkdownPath === undefined
+      ? {}
+      : { convertedMarkdownPath: requireString(object.convertedMarkdownPath, `sources[${index}].convertedMarkdownPath`) }),
+    ...(object.convertedAssetPaths === undefined
+      ? {}
+      : {
+          convertedAssetPaths: requireArray(object.convertedAssetPaths, `sources[${index}].convertedAssetPaths`).map((entry, entryIndex) =>
+            requireString(entry, `sources[${index}].convertedAssetPaths[${entryIndex}]`)
+          )
+        }),
+    ...(object.converterName === undefined ? {} : { converterName: requireEnum(object.converterName, ["marker"], `sources[${index}].converterName`) }),
+    ...(object.converterCommand === undefined ? {} : { converterCommand: requireString(object.converterCommand, `sources[${index}].converterCommand`) }),
+    ...(object.conversionError === undefined ? {} : { conversionError: requireString(object.conversionError, `sources[${index}].conversionError`) }),
     ...(object.extractorMetadata === undefined ? {} : { extractorMetadata: validateExtractorMetadata(object.extractorMetadata, `sources[${index}].extractorMetadata`) }),
     ...(object.reason === undefined ? {} : { reason: requireString(object.reason, `sources[${index}].reason`) }),
     ...(object.lastMarkedAt === undefined ? {} : { lastMarkedAt: requireString(object.lastMarkedAt, `sources[${index}].lastMarkedAt`) })
@@ -486,9 +546,9 @@ function validateSummaryCounts(value: unknown): IngestSummaryCounts {
 function validateExtractorReport(value: unknown): ExtractorReport {
   try {
     const object = requireObject(value, "extractor report");
-    if (object.schemaVersion !== INGEST_SCHEMA_VERSION) throw new Error("Unsupported extractor report schemaVersion.");
+    if (object.schemaVersion !== INGEST_EXTRACTOR_REPORT_SCHEMA_VERSION) throw new Error("Unsupported extractor report schemaVersion.");
     return {
-      schemaVersion: INGEST_SCHEMA_VERSION,
+      schemaVersion: INGEST_EXTRACTOR_REPORT_SCHEMA_VERSION,
       planId: requireString(object.planId, "planId"),
       createdAt: requireString(object.createdAt, "createdAt"),
       extractorName: requireString(object.extractorName, "extractorName"),
@@ -544,6 +604,95 @@ function requireArray(value: unknown, label: string): unknown[] {
 function requireEnum<const T extends string>(value: unknown, allowed: readonly T[], label: string): T {
   if (typeof value !== "string" || !allowed.includes(value as T)) throw new Error(`${label} must be one of: ${allowed.join(", ")}.`);
   return value as T;
+}
+
+function validateArchivedRawPath(value: unknown, label: string): string {
+  const archivedRawPath = requireString(value, label);
+  if (path.isAbsolute(archivedRawPath) || archivedRawPath.includes("..") || archivedRawPath === INGEST_ARCHIVE_DIR) {
+    throw new Error(`${label} must be inside ${INGEST_ARCHIVE_DIR}/.`);
+  }
+  if (!archivedRawPath.startsWith(`${INGEST_ARCHIVE_DIR}/`)) {
+    throw new Error(`${label} must be inside ${INGEST_ARCHIVE_DIR}/.`);
+  }
+  return archivedRawPath;
+}
+
+const conversionStatuses = [
+  "not-needed",
+  "converted",
+  "asset-only",
+  "missing-tool",
+  "disabled",
+  "timeout",
+  "failed",
+  "missing-output",
+  "unsupported",
+  "unsafe-output",
+  "oversized"
+] as const satisfies readonly ConversionStatus[];
+
+async function validateSourceConversion(root: string, plan: IngestPlanSidecar, source: IngestSource): Promise<string[]> {
+  const failures: string[] = [];
+  const checkPath = async (field: string, relativePath: string, requireMarkdownBody: boolean): Promise<void> => {
+    if (!conversionPathIsInsideConvertedDir(root, plan.planId, relativePath)) {
+      failures.push(`${source.rawPath} has unsafe ${field}: ${relativePath}`);
+      return;
+    }
+    const absolute = path.join(root, relativePath);
+    if (!(await pathExists(absolute))) {
+      failures.push(`${source.rawPath} is missing converted output ${relativePath}.`);
+      return;
+    }
+    if (requireMarkdownBody && (await readText(absolute)).trim().length === 0) {
+      failures.push(`${source.rawPath} has empty converted markdown ${relativePath}.`);
+    }
+  };
+
+  if (source.convertedMarkdownPath) {
+    await checkPath("convertedMarkdownPath", source.convertedMarkdownPath, source.conversionStatus !== "asset-only");
+  }
+  for (const assetPath of source.convertedAssetPaths ?? []) {
+    await checkPath("convertedAssetPaths", assetPath, false);
+  }
+
+  if (source.conversionStatus === "converted" && !source.convertedMarkdownPath) {
+    failures.push(`${source.rawPath} is marked converted without convertedMarkdownPath.`);
+  }
+  if (source.conversionStatus === "asset-only" && (source.convertedAssetPaths ?? []).length === 0) {
+    failures.push(`${source.rawPath} is marked asset-only without converted assets.`);
+  }
+
+  const unhandledConversionStatuses = new Set<ConversionStatus>([
+    "missing-tool",
+    "disabled",
+    "timeout",
+    "failed",
+    "missing-output",
+    "unsupported",
+    "unsafe-output",
+    "oversized"
+  ]);
+  if (source.status === "planned" && unhandledConversionStatuses.has(source.conversionStatus)) {
+    failures.push(`${source.rawPath} conversion is ${source.conversionStatus}: ${source.conversionError ?? "conversion did not produce readable markdown."}`);
+  }
+  return failures;
+}
+
+function conversionValidationError(plan: IngestPlanSidecar, failures: string[]): Error | undefined {
+  if (failures.length === 0) return undefined;
+  const message = failures.join("\n");
+  if (failures.some((failure) => failure.includes("unsafe convertedMarkdownPath") || failure.includes("unsafe convertedAssetPaths"))) {
+    return new IngestConversionUnsafeOutputError(message);
+  }
+  const unhandled = plan.sources.find((source) => source.status === "planned" && source.conversionStatus !== "not-needed" && source.conversionStatus !== "converted");
+  if (!unhandled) return undefined;
+  if (unhandled.conversionStatus === "missing-tool") return new IngestMarkerMissingError(message);
+  if (unhandled.conversionStatus === "timeout") return new IngestConversionTimeoutError(message);
+  if (unhandled.conversionStatus === "failed") return new IngestConversionFailedError(message);
+  if (unhandled.conversionStatus === "missing-output") return new IngestConversionMissingOutputError(message);
+  if (unhandled.conversionStatus === "unsupported") return new IngestConversionUnsupportedFileError(message);
+  if (unhandled.conversionStatus === "unsafe-output") return new IngestConversionUnsafeOutputError(message);
+  return undefined;
 }
 
 async function writePlan(root: string, plan: IngestPlanSidecar): Promise<void> {
@@ -611,6 +760,13 @@ function renderMarkdownPlan(plan: IngestPlanSidecar): string {
       `- Size: ${source.sizeBytes}`,
       `- Expected summary: ${source.expectedSummaryPath}`,
       `- Content kind: ${source.contentKind}`,
+      ...(source.archivedRawPath ? [`- Archived raw: ${source.archivedRawPath}`] : []),
+      `- Conversion: ${source.conversionStatus}`,
+      ...(source.convertedMarkdownPath ? [`- Read for summary: ${source.convertedMarkdownPath}`] : []),
+      ...(source.convertedAssetPaths && source.convertedAssetPaths.length > 0 ? [`- Converted assets: ${source.convertedAssetPaths.join(", ")}`] : []),
+      ...(source.converterName ? [`- Converter: ${source.converterName}`] : []),
+      ...(source.conversionError ? [`- Conversion note: ${source.conversionError}`] : []),
+      `- Preserve provenance: ${source.rawPath} (${source.sha256})`,
       ...(source.reason ? [`- Reason: ${source.reason}`] : []),
       ...(source.extractorMetadata
         ? [
@@ -691,8 +847,8 @@ async function markDriftedSources(root: string, plan: IngestPlanSidecar): Promis
   let changed = false;
   for (const source of plan.sources) {
     if (source.status === "skipped" || source.status === "deferred") continue;
-    const fullPath = path.join(root, source.rawPath);
-    if (!(await pathExists(fullPath))) continue;
+    const fullPath = await sourceStoragePath(root, source);
+    if (!fullPath) continue;
     const currentHash = await sha256File(fullPath);
     if (currentHash !== source.sha256 && source.status !== "changed") {
       source.status = "changed";
@@ -704,8 +860,8 @@ async function markDriftedSources(root: string, plan: IngestPlanSidecar): Promis
 }
 
 async function failOnDrift(root: string, plan: IngestPlanSidecar, source: IngestSource): Promise<void> {
-  const fullPath = path.join(root, source.rawPath);
-  if (!(await pathExists(fullPath))) throw new IngestRawDriftError(`${source.rawPath} is missing from raw evidence.`);
+  const fullPath = await sourceStoragePath(root, source);
+  if (!fullPath) throw new IngestRawDriftError(`${source.rawPath} is missing from raw evidence.`);
   const currentHash = await sha256File(fullPath);
   if (currentHash !== source.sha256) {
     source.status = "changed";
@@ -716,6 +872,57 @@ async function failOnDrift(root: string, plan: IngestPlanSidecar, source: Ingest
     await writeMarkdownPlan(root, plan);
     throw new IngestRawDriftError(`${source.rawPath} hash changed since planning.`);
   }
+}
+
+async function sourceStoragePath(root: string, source: IngestSource): Promise<string | undefined> {
+  if (source.archivedRawPath) {
+    const archivedPath = path.join(root, source.archivedRawPath);
+    if (await pathExists(archivedPath)) return archivedPath;
+  }
+  const rawPath = path.join(root, source.rawPath);
+  if (await pathExists(rawPath)) return rawPath;
+  return undefined;
+}
+
+async function archiveRawSource(root: string, source: IngestSource): Promise<string> {
+  if (source.archivedRawPath && (await pathExists(path.join(root, source.archivedRawPath)))) return source.archivedRawPath;
+  const currentPath = path.join(root, source.rawPath);
+  if (!(await pathExists(currentPath))) {
+    if (source.archivedRawPath) return source.archivedRawPath;
+    throw new IngestRawDriftError(`${source.rawPath} is missing from raw evidence.`);
+  }
+  const relativeFromRaw = toPosixPath(path.relative("raw", source.rawPath));
+  const baseArchivePath = `${INGEST_ARCHIVE_DIR}/${relativeFromRaw}`;
+  const archivePath = await availableArchivePath(root, baseArchivePath, source.sha256);
+  await mkdir(path.dirname(path.join(root, archivePath)), { recursive: true });
+  await rename(currentPath, path.join(root, archivePath));
+  return archivePath;
+}
+
+async function archiveMergedRawSources(root: string, plan: IngestPlanSidecar): Promise<boolean> {
+  let changed = false;
+  for (const source of plan.sources) {
+    if (source.status !== "merged") continue;
+    const archivedRawPath = await archiveRawSource(root, source);
+    if (source.archivedRawPath !== archivedRawPath) {
+      source.archivedRawPath = archivedRawPath;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+async function availableArchivePath(root: string, archivePath: string, sha256: string): Promise<string> {
+  if (!(await pathExists(path.join(root, archivePath)))) return archivePath;
+  const extension = path.extname(archivePath);
+  const withoutExtension = archivePath.slice(0, archivePath.length - extension.length);
+  const candidate = `${withoutExtension}-${sha256.slice(0, 8)}${extension}`;
+  if (!(await pathExists(path.join(root, candidate)))) return candidate;
+  let suffix = 2;
+  while (await pathExists(path.join(root, `${withoutExtension}-${sha256.slice(0, 8)}-${suffix}${extension}`))) {
+    suffix += 1;
+  }
+  return `${withoutExtension}-${sha256.slice(0, 8)}-${suffix}${extension}`;
 }
 
 function isLegalTransition(current: IngestSourceStatus, target: IngestMarkStatus): boolean {
@@ -729,7 +936,7 @@ async function durableWikiCitations(root: string): Promise<Set<string>> {
   const pages = await listMarkdownFiles(root, "wiki");
   const cited = new Set<string>();
   for (const page of pages) {
-    if (page.startsWith("wiki/sources/") || page.startsWith("wiki/templates/") || page.startsWith(`${INGEST_PLAN_DIR}/`)) continue;
+    if (page.startsWith("wiki/sources/") || page.startsWith("wiki/templates/") || page.startsWith(`${LEGACY_INGEST_PLAN_DIR}/`)) continue;
     const body = await readText(path.join(root, page));
     for (const match of body.matchAll(/wiki\/sources\/[A-Za-z0-9._/-]+\.md/g)) {
       cited.add(match[0]);
@@ -808,7 +1015,10 @@ async function makePlanId(root: string, now: string): Promise<string> {
   const base = `ingest-${now.replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z").replace(/[TZ]/g, "-").replace(/-$/, "")}`;
   let candidate = base;
   let suffix = 2;
-  while (await pathExists(path.join(root, INGEST_PLAN_DIR, `${candidate}.json`))) {
+  while (
+    (await pathExists(path.join(root, INGEST_PLAN_DIR, `${candidate}.json`))) ||
+    (await pathExists(path.join(root, LEGACY_INGEST_PLAN_DIR, `${candidate}.json`)))
+  ) {
     candidate = `${base}-${suffix}`;
     suffix += 1;
   }

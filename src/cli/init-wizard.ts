@@ -6,12 +6,14 @@ import { getTopicTemplate, TOPIC_TEMPLATE_IDS, type ResolvedTopicSelection, type
 import type { HostId } from "../core/types.js";
 import { buildInitPlan, groupInitPlanFiles, type InitFileGroupId, type InitPlan } from "./init-plan.js";
 import { createPromptRuntime, hostPromptChoices, type PromptRuntime, type TopicPromptChoice } from "./prompt-runtime.js";
+import { setupMarkerWithInstallPrompt, type MarkerSetupResult } from "./marker-install.js";
 import { QMD_INSTALL_PROMPT, QMD_SETUP_HINT, QMD_SETUP_PROMPT } from "./qmd-install.js";
 
 export interface InitPreviewModel {
   root: string;
   hosts: string[];
   obsidian: boolean;
+  marker: string;
   qmd: boolean;
   topic: {
     id: TopicSelectionId;
@@ -43,6 +45,7 @@ export async function runInitWizard(
   const hosts = await runtime.selectHosts(hostPromptChoices());
   const topic = fixedTopic ?? (await selectTopic(runtime));
   const obsidianEnabled = fixedObsidianEnabled ?? (await runtime.confirm("Set up Obsidian vault metadata and graph view?", true));
+  const markerSetup = await setupMarkerWithInstallPrompt(root, runtime);
   const qmdEnabled = fixedQmdEnabled ?? (await runtime.confirm(QMD_SETUP_PROMPT, false, QMD_SETUP_HINT));
   let qmdInstallApproved: boolean | undefined = false;
   if (qmdEnabled) {
@@ -53,18 +56,19 @@ export async function runInitWizard(
     }
   }
   const plan = buildInitPlan(root, hosts, topic, obsidianEnabled, qmdEnabled, qmdInstallApproved);
-  runtime.write(renderInitPreview(buildInitPreviewModel(plan), { decorated: runtime.decorated }));
+  runtime.write(renderInitPreview(buildInitPreviewModel(plan, markerSetup), { decorated: runtime.decorated }));
   const confirmed = await runtime.confirm("Create these LLM Wiki skill files?", true);
   if (!confirmed) throw new HostSelectionCanceledError();
   return plan;
 }
 
-export function buildInitPreviewModel(plan: InitPlan): InitPreviewModel {
+export function buildInitPreviewModel(plan: InitPlan, markerSetup: MarkerSetupResult = { status: "missing", message: "not checked" }): InitPreviewModel {
   const grouped = groupInitPlanFiles(plan);
   return {
     root: plan.root,
     hosts: plan.hosts.map(hostLabel),
     obsidian: plan.obsidianEnabled,
+    marker: markerSetup.message,
     qmd: plan.qmdEnabled,
     topic: {
       id: plan.topic.id,
@@ -110,6 +114,7 @@ export function renderInitPreview(model: InitPreviewModel, options: RenderInitPr
     `${ui.dim("Hosts")} ${model.hosts.join(", ")}`,
     `${ui.dim("Topic")} ${model.topic.label}${model.topic.customTopic ? `: ${model.topic.customTopic}` : ""}`,
     `${ui.dim("Obsidian")} ${model.obsidian ? "enabled" : "disabled"}`,
+    `${ui.dim("Marker")} ${model.marker}`,
     `${ui.dim("qmd")} ${model.qmd ? "enabled after setup" : "disabled"}`,
     `${ui.dim("Examples")} ${model.topic.examples.join(", ")}`,
     "",

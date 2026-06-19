@@ -35,6 +35,7 @@ AI agents are useful until they forget the context you gave them last week. `llm
 - **Agent-native:** installs skills for Codex and Claude Code, not just docs for humans.
 - **Local-first:** no hosted memory service, no remote database, no required account.
 - **Source-grounded:** raw evidence and synthesized wiki pages stay separate.
+- **Custom-format markdown conversion:** convert PDF, DOCX, PPTX, XLSX, XLS, HTML, HTM, EPUB, PNG, JPG, JPEG, WEBP, TIF, TIFF, and BMP files into markdown during ingest planning when Marker is installed.
 - **Topic-aware:** choose a scaffold for research, product work, trips, investing, medical notes, legal/admin records, and more.
 - **Web-only graph atlas:** visualize, search, and read your wiki in a browser. Obsidian is optional, not required.
 - **Static deploy:** export the atlas as plain web assets for GitHub Pages, Netlify, Vercel, or any static host.
@@ -179,11 +180,16 @@ For bigger raw folders, create a batch plan first:
 
 ```sh
 npx llm-wiki-skills ingest plan --raw raw/sources
+npx llm-wiki-skills ingest converters status
 npx llm-wiki-skills ingest status --plan PLAN_ID
 npx llm-wiki-skills ingest validate --plan PLAN_ID
 ```
 
-The ingest commands help track source files before your agent synthesizes them into wiki pages.
+The ingest commands help track source files before your agent synthesizes them into wiki pages. PDF, DOCX, PPTX, and other Marker-supported raw files are converted to markdown by default when Marker is installed. Marker is an external Python/PyTorch tool and is not bundled with this MIT-licensed npm package; install it separately if you want multimedia conversion.
+
+Ingest plans, converted markdown, and converted assets are written under `.llm-wiki-skills/ingest-plans/`, outside `wiki/` so the wiki stays focused on durable knowledge. Source summaries should read converted markdown when present, but still cite the original `raw/` path and SHA-256 from the plan.
+
+When a source is marked `merged`, the CLI moves the raw file into `raw/archieved/` and keeps the original raw path plus SHA-256 in the ingest plan for provenance. Future ingest plans skip everything under `raw/archieved/`, including when scanning `--raw raw`.
 
 For best results, ask your AI agent to handle this workflow. The installed skills tell the agent when to use these commands.
 
@@ -211,6 +217,7 @@ docs/llm-wiki-contract.md    local wiki rules
 docs/llm-wiki-workflows.md   ingest/query/lint workflow reference
 .obsidian/                   optional Obsidian vault settings
 .llm-wiki-skills.json        install manifest for status checks
+.llm-wiki-skills/            CLI-owned ingest plans and converted intermediates
 ```
 
 Topic scaffolds add useful `wiki/` categories and a routing guide at `docs/llm-wiki-routing.md`.

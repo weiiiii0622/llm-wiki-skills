@@ -13,6 +13,7 @@ import {
   hostPromptChoices,
   topicOptionsPerPage
 } from "../src/cli/prompt-runtime.js";
+import { MARKER_INSTALL_HINT, MARKER_INSTALL_PROMPT } from "../src/cli/marker-install.js";
 import { QMD_SETUP_HINT, QMD_SETUP_PROMPT } from "../src/cli/qmd-install.js";
 import { TOPIC_TEMPLATE_IDS, getTopicTemplate } from "../src/core/topic-templates.js";
 
@@ -87,6 +88,13 @@ const enquirerMock = vi.hoisted(() => {
 vi.mock("prompts", () => ({ default: promptsMock.prompt }));
 vi.mock("enquirer", () => ({
   default: enquirerMock.Enquirer
+}));
+vi.mock("../src/core/ingest/converters.js", () => ({
+  markerProviderStatus: vi.fn(async () => ({
+    name: "marker",
+    available: false,
+    setupHint: "Install Marker outside this package, or rerun init and approve the managed Python virtual environment setup."
+  }))
 }));
 
 describe("topic templates", () => {
@@ -388,6 +396,7 @@ describe("init wizard", () => {
       text: vi.fn(async () => ""),
       confirm: vi.fn(async (message: string) => {
         confirmMessages.push(message);
+        if (message === MARKER_INSTALL_PROMPT) return false;
         if (message.startsWith("Set up qmd hybrid semantic search?")) return true;
         if (message === "Allow to install qmd by `npm install -g @tobilu/qmd`?") return false;
         return true;
@@ -398,10 +407,12 @@ describe("init wizard", () => {
 
     expect(confirmMessages).toEqual([
       "Set up Obsidian vault metadata and graph view?",
+      MARKER_INSTALL_PROMPT,
       QMD_SETUP_PROMPT,
       "Allow to install qmd by `npm install -g @tobilu/qmd`?",
       "Create these LLM Wiki skill files?"
     ]);
+    expect(runtime.confirm).toHaveBeenCalledWith(MARKER_INSTALL_PROMPT, false, MARKER_INSTALL_HINT);
     expect(runtime.confirm).toHaveBeenCalledWith(QMD_SETUP_PROMPT, false, QMD_SETUP_HINT);
     expect(plan.qmdEnabled).toBe(true);
     expect(plan.qmdInstallApproved).toBe(false);

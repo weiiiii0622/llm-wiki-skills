@@ -40,6 +40,7 @@ export interface ScriptedPromptAnswers {
   topic?: TopicSelectionId;
   customTopic?: string;
   obsidian?: boolean;
+  markerInstall?: boolean;
   qmd?: boolean;
   qmdCpu?: boolean;
   qmdInstall?: boolean;
@@ -152,6 +153,7 @@ export function createScriptedPromptRuntime(script: ScriptedPromptAnswers, optio
     async confirm(message: string, initial = true): Promise<boolean> {
       if (script.cancel === "confirm") throw new HostSelectionCanceledError();
       if (message.startsWith("Set up Obsidian")) return script.obsidian ?? initial;
+      if (message.startsWith("Allow to install Marker")) return script.markerInstall ?? initial;
       if (message.startsWith("Set up qmd")) return script.qmd ?? initial;
       if (message === "Allow to install qmd by `npm install -g @tobilu/qmd`?") return script.qmdInstall ?? initial;
       if (message.startsWith("qmd semantic setup could not use GPU acceleration")) return script.qmdCpu ?? initial;
@@ -355,12 +357,13 @@ function readScriptedPromptAnswers(): ScriptedPromptAnswers | undefined {
   const topic = typeof parsed.topic === "string" && isTopicSelection(parsed.topic) ? parsed.topic : undefined;
   const customTopic = typeof parsed.customTopic === "string" ? parsed.customTopic : undefined;
   const obsidian = typeof parsed.obsidian === "boolean" ? parsed.obsidian : undefined;
+  const markerInstall = typeof parsed.markerInstall === "boolean" ? parsed.markerInstall : undefined;
   const qmd = typeof parsed.qmd === "boolean" ? parsed.qmd : undefined;
   const qmdCpu = typeof parsed.qmdCpu === "boolean" ? parsed.qmdCpu : undefined;
   const qmdInstall = typeof parsed.qmdInstall === "boolean" ? parsed.qmdInstall : undefined;
   const confirm = typeof parsed.confirm === "boolean" ? parsed.confirm : undefined;
   const cancel = parsed.cancel === "hosts" || parsed.cancel === "topic" || parsed.cancel === "text" || parsed.cancel === "confirm" ? parsed.cancel : undefined;
-  return { hosts, topic, customTopic, obsidian, qmd, qmdCpu, qmdInstall, confirm, cancel };
+  return { hosts, topic, customTopic, obsidian, markerInstall, qmd, qmdCpu, qmdInstall, confirm, cancel };
 }
 
 function hostHint(host: HostId): string {

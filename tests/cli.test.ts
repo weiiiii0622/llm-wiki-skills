@@ -357,6 +357,57 @@ describe("cli", () => {
     expect(manifest.integrations.qmd).toMatchObject({ enabled: true, searchMode: "hybrid", runtimeMode: "gpu-auto" });
   });
 
+  it("interactive init detects installed Marker and shows it above qmd in preview", async () => {
+    const root = await tempRoot("llm-wiki-marker-wizard-available-");
+    const fake = await fakeMarkerEnv();
+    const result = await execaNode(["dist/cli/index.js", "init", "--root", root], fixedEnv({ hosts: ["codex"], qmd: false, confirm: true }, fake.env));
+
+    const marker = result.stdout.indexOf("Marker available (marker_single)");
+    const qmd = result.stdout.indexOf("qmd disabled");
+    expect(marker).toBeGreaterThanOrEqual(0);
+    expect(qmd).toBeGreaterThan(marker);
+    expect(result.stdout).not.toContain("Running `python3 -m venv");
+    await expect(readFile(path.join(root, ".agents/skills/llm-wiki-ingest/SKILL.md"), "utf8")).resolves.toContain("# LLM Wiki Ingest");
+  });
+
+  it("interactive init prompts to install Marker before qmd when Marker is missing", async () => {
+    const root = await tempRoot("llm-wiki-marker-wizard-install-");
+    const fake = await fakeInstallableMarkerEnv();
+    const result = await execaNode(
+      ["dist/cli/index.js", "init", "--root", root],
+      fixedEnv({ hosts: ["codex"], markerInstall: true, qmd: false, confirm: true }, fake.env)
+    );
+
+    const installStart = result.stdout.indexOf("Running `python3 -m venv");
+    const installLog = result.stdout.indexOf("installing marker fake log");
+    const pipInstall = result.stdout.indexOf("-m pip install marker-pdf[full]");
+    const preview = result.stdout.indexOf("LLM Wiki init preview");
+    const marker = result.stdout.indexOf("Marker installed during setup");
+    const qmd = result.stdout.indexOf("qmd disabled");
+    expect(installStart).toBeGreaterThanOrEqual(0);
+    expect(pipInstall).toBeGreaterThan(installStart);
+    expect(installLog).toBeGreaterThan(pipInstall);
+    expect(preview).toBeGreaterThan(installLog);
+    expect(marker).toBeGreaterThan(preview);
+    expect(qmd).toBeGreaterThan(marker);
+    expect(await readFile(fake.log, "utf8")).toContain("python3 -m venv");
+    expect(await readFile(fake.log, "utf8")).toContain("venv-python -m pip install marker-pdf[full]");
+    expect(await readFile(fake.log, "utf8")).toContain(`python-cwd ${await realpath(root)}`);
+  });
+
+  it("interactive init records missing Marker when the user declines installation", async () => {
+    const root = await tempRoot("llm-wiki-marker-wizard-declined-");
+    const emptyBin = await tempRoot("llm-wiki-empty-marker-wizard-bin-");
+    const result = await execaNode(
+      ["dist/cli/index.js", "init", "--root", root],
+      fixedEnv({ hosts: ["codex"], markerInstall: false, qmd: false, confirm: true }, { PATH: emptyBin })
+    );
+
+    expect(result.stdout).toContain("Marker not installed");
+    expect(result.stdout).not.toContain("Running `python3 -m venv");
+    await expect(readFile(path.join(root, ".agents/skills/llm-wiki-ingest/SKILL.md"), "utf8")).resolves.toContain("# LLM Wiki Ingest");
+  });
+
   it("init --qmd reports qmd enable follow-up when user declines installation", async () => {
     const root = await tempRoot("llm-wiki-qmd-declined-");
     const emptyBin = await tempRoot("llm-wiki-empty-bin-");
@@ -638,6 +689,13 @@ describe("cli", () => {
     expect(combined).toContain("new questions or sources worth investigating");
     expect(combined).toContain("Use `npx llm-wiki-skills` by default for CLI commands.");
     expect(combined).toContain("npx llm-wiki-skills ingest plan");
+    expect(combined).toContain("The ingest planner owns converter tools.");
+    expect(combined).toContain("npx llm-wiki-skills ingest converters status");
+    expect(combined).toContain("Do not try ad hoc PDF/OCR extraction tools first");
+    expect(combined).toContain("pdfinfo");
+    expect(combined).toContain("pdftotext");
+    expect(combined).toContain("pypdf");
+    expect(combined).toContain("pdfplumber");
     expect(combined).toContain("npx llm-wiki-skills qmd reindex");
     expect(combined).not.toContain("Run `llm-wiki-skills ingest plan");
     expect(combined).not.toContain("llm-wiki-skills graph");
@@ -781,6 +839,7 @@ describe("cli", () => {
 function fixedEnv(promptAnswers?: Record<string, unknown>, extraEnv: Record<string, string> = {}): Record<string, string> {
   return {
     LLM_WIKI_SKILLS_NOW: "2026-06-10T00:00:00.000Z",
+    LLM_WIKI_MARKER_VENV: path.join(os.tmpdir(), "llm-wiki-skills-test-missing-marker-venv"),
     ...extraEnv,
     ...(promptAnswers ? { LLM_WIKI_SKILLS_TEST_PROMPTS: JSON.stringify(promptAnswers) } : {})
   };
@@ -862,6 +921,41 @@ exit 0
 `
   );
   return { env: { PATH: bin, QMD_LOG: log, QMD_INSTALL_BIN: bin }, log };
+}
+
+async function fakeMarkerEnv(): Promise<{ env: Record<string, string>; log: string }> {
+  const bin = await tempRoot("llm-wiki-fake-marker-wizard-bin-");
+  const log = path.join(bin, "marker.log");
+  await mkdir(bin, { recursive: true });
+  await writeExecutable(
+    path.join(bin, "marker_single"),
+    `#!/bin/sh
+printf "marker_single %s\\n" "$*" >> "$MARKER_LOG"
+exit 0
+`
+  );
+  return { env: { PATH: bin, MARKER_LOG: log }, log };
+}
+
+async function fakeInstallableMarkerEnv(): Promise<{ env: Record<string, string>; log: string }> {
+  const bin = await tempRoot("llm-wiki-installable-marker-bin-");
+  const venv = await tempRoot("llm-wiki-marker-venv-");
+  const log = path.join(bin, "marker.log");
+  await mkdir(bin, { recursive: true });
+  await writeExecutable(
+    path.join(bin, "python3"),
+    `#!/bin/sh
+printf "python3 %s\\n" "$*" >> "$MARKER_LOG"
+printf "python-cwd %s\\n" "$PWD" >> "$MARKER_LOG"
+if [ "$1 $2" = "-m venv" ]; then
+  /bin/mkdir -p "$3/bin"
+  printf '%s\\n' '#!/bin/sh' 'printf "venv-python %s\\\\n" "$*" >> "$MARKER_LOG"' 'echo "installing marker fake log"' 'printf "%s\\\\n" "#!/bin/sh" "exit 0" > "$MARKER_VENV/bin/marker_single"' '/bin/chmod +x "$MARKER_VENV/bin/marker_single"' 'exit 0' > "$3/bin/python"
+  /bin/chmod +x "$3/bin/python"
+fi
+exit 0
+`
+  );
+  return { env: { PATH: bin, MARKER_LOG: log, MARKER_VENV: venv, LLM_WIKI_MARKER_VENV: venv }, log };
 }
 
 async function writeExecutable(target: string, content: string): Promise<void> {
