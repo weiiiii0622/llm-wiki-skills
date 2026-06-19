@@ -13,6 +13,9 @@
 <p align="center">
   <a href="https://www.npmjs.com/package/llm-wiki-skills"><img src="https://img.shields.io/npm/v/llm-wiki-skills?color=111827" alt="npm version"></a>
   <a href="https://www.npmjs.com/package/llm-wiki-skills"><img src="https://img.shields.io/npm/dm/llm-wiki-skills?color=2563eb" alt="npm downloads"></a>
+  <a href="https://github.com/weiiiii0622/llm-wiki-skills/actions/workflows/release.yml"><img src="https://img.shields.io/github/actions/workflow/status/weiiiii0622/llm-wiki-skills/release.yml?style=flat-square&logo=githubactions&label=release" alt="release status"></a>
+  <img src="https://img.shields.io/node/v/llm-wiki-skills?style=flat-square&logo=nodedotjs" alt="Node.js version">
+  <img src="https://img.shields.io/badge/Obsidian-compatible-7c3aed?style=flat-square&logo=obsidian" alt="Obsidian compatible">
   <a href="https://github.com/weiiiii0622/llm-wiki-skills/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/llm-wiki-skills?color=0f766e" alt="license"></a>
 </p>
 
@@ -20,30 +23,30 @@
 npx llm-wiki-skills init
 ```
 
-## Why This Exists
+## 🧠 Why This Exists
 
 AI agents are useful until they forget the context you gave them last week. `llm-wiki-skills` gives them a local place to preserve what they learn:
 
-| Before | After |
+| Before 😵 | After ✅ |
 | --- | --- |
 | Notes, PDFs, meeting docs, and decisions live in scattered files. | Sources stay in `raw/`, durable knowledge lands in `wiki/`, and agents know how to update it. |
 | Every session starts with "read these files again." | Codex or Claude Code can ingest, query, and lint the same local vault. |
 | Search depends on whatever the model happens to load. | Markdown stays canonical, with optional local qmd search acceleration. |
 
-## Key Features
+## ✨ Key Features
 
-- **Agent-native:** installs skills for Codex and Claude Code, not just docs for humans.
-- **Local-first:** no hosted memory service, no remote database, no required account.
-- **Source-grounded:** raw evidence and synthesized wiki pages stay separate.
-- **Custom-format markdown conversion:** convert PDF, DOCX, PPTX, XLSX, XLS, HTML, HTM, EPUB, PNG, JPG, JPEG, WEBP, TIF, TIFF, and BMP files into markdown during ingest planning when Marker is installed.
-- **Topic-aware:** choose a scaffold for research, product work, trips, investing, medical notes, legal/admin records, and more.
-- **Web-only graph atlas:** visualize, search, and read your wiki in a browser. Obsidian is optional, not required.
-- **Static deploy:** export the atlas as plain web assets for GitHub Pages, Netlify, Vercel, or any static host.
-- **QMD search:** optional `qmd` support adds local SQLite-backed hybrid search while markdown remains the source of truth.
+- 🤖 **Agent-native:** installs skills for Codex and Claude Code, not just docs for humans.
+- 🏠 **Local-first:** no hosted memory service, no remote database, no required account.
+- 📎 **Source-grounded:** raw evidence and synthesized wiki pages stay separate.
+- 🧩 **Custom-format markdown conversion:** convert PDF, DOCX, PPTX, XLSX, XLS, HTML, HTM, EPUB, PNG, JPG, JPEG, WEBP, TIF, TIFF, and BMP files into markdown during ingest planning when Marker is installed.
+- 🗂️ **Topic-aware:** choose a scaffold for research, product work, trips, investing, medical notes, legal/admin records, and more.
+- 🌐 **Web-only graph atlas:** visualize, search, and read your wiki in a browser. Obsidian is optional, not required.
+- 🚢 **Static deploy:** export the atlas as plain web assets for GitHub Pages, Netlify, Vercel, or any static host.
+- 🔎 **QMD search:** optional `qmd` support adds local SQLite-backed hybrid search while markdown remains the source of truth.
 
-## Getting Started
+## 🚀 Getting Started
 
-### 1. `npx` (Recommended)
+### ⚡ 1. `npx` (Recommended)
 Run the setup wizard in any repo or markdown workspace:
 
 ```sh
@@ -69,7 +72,7 @@ Common flags:
 | `--qmd` | Add optional local qmd search support. |
 | `--json` / `--quiet` | Use in scripts or CI. |
 
-### 2. Global `npm` install
+### 📦 2. Global `npm` install
 
 ```sh
 npm install -g llm-wiki-skills
@@ -86,7 +89,7 @@ npx llm-wiki-skills status
   <img src="https://raw.githubusercontent.com/weiiiii0622/llm-wiki-skills/main/media/llm-wiki-skills-installation.gif" alt="Installing llm-wiki-skills and creating a local wiki vault" width="720">
 </p>
 
-## Installation
+## 🛠️ Installation
 
 Use it directly with `npx`:
 
@@ -108,7 +111,7 @@ Requirements:
 - Obsidian is optional. The web UI can visualize the wiki by itself.
 - A project folder or markdown vault where local files can be created.
 
-#### Non-interactive installation supported
+#### 🤖 Non-interactive installation supported
 
 ```sh
 npx llm-wiki-skills init --host codex --topic product-builder
@@ -125,9 +128,9 @@ Common flags:
 | `--qmd` | Add optional local qmd search support. |
 | `--json` / `--quiet` | Use in scripts or CI. |
 
-## Usage
+## 🧭 Usage
 
-### Ask Your Agent to Use the Wiki
+### 🤖 Ask Your Agent to Use the Wiki
 
 After setup, use the installed skills in your agent:
 
@@ -146,7 +149,7 @@ Use the llm-wiki-lint skill. Find stale claims, contradictions,
 or missing cross-references before handoff.
 ```
 
-### Open or Deploy the Web UI
+### 🌐 Open or Deploy the Web UI
 
 The web UI is web-only: it lets you inspect the wiki graph in a browser and does not require Obsidian.
 
@@ -174,7 +177,7 @@ Then upload `dist/atlas` to any static web host. The export includes the graph, 
   <img src="https://raw.githubusercontent.com/weiiiii0622/llm-wiki-skills/main/media/llm-wiki-skills-webui.png" alt="llm-wiki-skills web UI" width="720">
 </p>
 
-### Plan Larger Ingests
+### 📋 Plan Larger Ingests
 
 For bigger raw folders, create a batch plan first:
 
@@ -193,7 +196,7 @@ When a source is marked `merged`, the CLI moves the raw file into `raw/archieved
 
 For best results, ask your AI agent to handle this workflow. The installed skills tell the agent when to use these commands.
 
-## Example Workflow
+## 🔁 Example Workflow
 
 ```text
 1. Drop source material into raw/sources/
@@ -206,7 +209,7 @@ For best results, ask your AI agent to handle this workflow. The installed skill
 
 A small demo vault is included at [`fixtures/demo-vault`](fixtures/demo-vault). Use it to inspect the expected shape before initializing your own workspace.
 
-## Topic Vault Structure
+## 🗂️ Topic Vault Structure
 
 Every vault starts with the same simple contract:
 
@@ -222,7 +225,7 @@ docs/llm-wiki-workflows.md   ingest/query/lint workflow reference
 
 Topic scaffolds add useful `wiki/` categories and a routing guide at `docs/llm-wiki-routing.md`.
 
-| Topic | Best for | Example categories |
+| Topic 🗂️ | Best for | Example categories |
 | --- | --- | --- |
 | `general` | Mixed notes and broad research | projects, areas, resources, questions |
 | `study-research` | Papers, courses, experiments | concepts, papers, methods, datasets |
@@ -254,7 +257,7 @@ wiki/
 `-- templates/
 ```
 
-## qmd Search Support
+## 🔎 qmd Search Support
 
 qmd is optional and off by default. Enable it when your wiki is large enough that local hybrid search is useful:
 
@@ -266,9 +269,9 @@ npx llm-wiki-skills qmd reindex
 
 Markdown under `wiki/` remains canonical. qmd is only used for local candidate discovery.
 
-## What This Is / Is Not
+## ✅ What This Is / Is Not
 
-| This is | This is not |
+| ✅ This is | 🚫 This is not |
 | --- | --- |
 | A local installer for agent wiki workflows. | A hosted memory service. |
 | A way to keep raw evidence and durable knowledge organized. | A replacement for reviewing source material. |
