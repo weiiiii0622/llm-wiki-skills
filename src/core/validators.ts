@@ -2,6 +2,7 @@ import path from "node:path";
 import { readText, pathExists } from "./fs.js";
 import { buildGraph, graphJson, loadWikiPages, renderGraphMarkdown } from "./graph.js";
 import { frontmatterArray, slugify } from "./markdown.js";
+import { buildOkfConformance, isOkfReservedFile } from "./okf.js";
 import type { ValidationIssue, WikiPage } from "./types.js";
 
 export async function validateVault(root: string): Promise<{ pages: WikiPage[]; issues: ValidationIssue[] }> {
@@ -22,6 +23,7 @@ export async function validateVault(root: string): Promise<{ pages: WikiPage[]; 
   for (const page of pages) {
     validateFrontmatterShape(page, issues);
   }
+  issues.push(...buildOkfConformance(pages).issues);
   for (const page of pages) {
     for (const link of [...page.wikilinks, ...page.sources]) {
       const normalized = link.replace(/\.md$/, "").replace(/^wiki\//, "");
@@ -60,6 +62,7 @@ export function findOrphanPages(pages: WikiPage[]): string[] {
 }
 
 function validateFrontmatterShape(page: WikiPage, issues: ValidationIssue[]): void {
+  if (isOkfReservedFile(page)) return;
   const type = page.frontmatter.type;
   const status = page.frontmatter.status;
   if (typeof type !== "string" || type.length === 0) {

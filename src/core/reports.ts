@@ -44,6 +44,7 @@ export function renderStatusReport(report: StatusReport): string {
     `Obsidian: ${report.integrations?.obsidian?.enabled ? "enabled" : "not configured"}`,
     `qmd: ${report.integrations?.qmd?.enabled ? `enabled (${report.integrations.qmd.collection})` : "not configured"}`,
     `Checked files: ${report.checkedFiles.length}`,
+    `OKF: ${report.okf.status.toUpperCase()} v${report.okf.version} (${report.okf.conceptPageCount} concept pages, ${report.okf.reservedFileCount} reserved files, ${report.okf.issueCount} issues)`,
     ""
   ].join("\n");
 }

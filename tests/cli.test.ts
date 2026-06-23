@@ -2,6 +2,7 @@ import { chmod, mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "
 import os from "node:os";
 import path from "node:path";
 import { INIT_CANCELED_MESSAGE } from "../src/core/errors.js";
+import { TOPIC_TEMPLATE_IDS } from "../src/core/topic-templates.js";
 import { execaNode } from "./helpers/process.js";
 import { describe, expect, it } from "vitest";
 
@@ -715,8 +716,93 @@ describe("cli", () => {
       status: "pass",
       hosts: ["codex"],
       topic: { id: "general", scaffoldId: "general" },
-      integrations: { obsidian: { enabled: true } }
+      integrations: { obsidian: { enabled: true } },
+      okf: {
+        version: "0.1",
+        status: "pass",
+        issueCount: 0,
+        conceptPageCount: 6,
+        reservedFileCount: 2
+      }
     });
+  });
+
+  it("status human output includes compact OKF summary", async () => {
+    const root = await tempRoot("llm-wiki-status-human-okf-");
+    await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--quiet"], fixedEnv());
+
+    const status = await execaNode(["dist/cli/index.js", "status", "--root", root], fixedEnv());
+
+    expect(status.stdout).toContain("Status: PASS");
+    expect(status.stdout).toContain("OKF: PASS v0.1 (6 concept pages, 2 reserved files, 0 issues)");
+  });
+
+  it("init generates OKF root index, log, concept metadata, and docs", async () => {
+    const root = await tempRoot("llm-wiki-init-okf-");
+    await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--quiet"], fixedEnv());
+
+    await expect(readFile(path.join(root, "wiki/index.md"), "utf8")).resolves.toContain('okf_version: "0.1"');
+    await expect(readFile(path.join(root, "wiki/log.md"), "utf8")).resolves.toBe("# Wiki Log\n\n## 2026-06-10\n\n- Initialized vault with llm-wiki-skills.\n");
+    const overview = await readFile(path.join(root, "wiki/overview.md"), "utf8");
+    expect(overview).toContain("title: Overview");
+    expect(overview).toContain("description: Starting page");
+    expect(overview).toContain("timestamp: 2026-06-10");
+    await expect(readFile(path.join(root, "docs/llm-wiki-contract.md"), "utf8")).resolves.toContain("## OKF Mapping");
+  });
+
+  it("lint passes for every topic scaffold", async () => {
+    for (const topic of TOPIC_TEMPLATE_IDS) {
+      const root = await tempRoot(`llm-wiki-${topic}-okf-`);
+      await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--topic", topic, "--quiet"], fixedEnv());
+      const lint = await execaNode(["dist/cli/index.js", "lint", "--root", root], fixedEnv());
+      expect(lint.stdout).toBe("Lint passed: no issues found.\n");
+    }
+  });
+
+  it("lint reports OKF concept pages missing type", async () => {
+    const root = await tempRoot("llm-wiki-okf-missing-type-");
+    await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--quiet"], fixedEnv());
+    await writeFile(
+      path.join(root, "wiki/topics/no-type.md"),
+      "---\ntitle: No Type\ndescription: Missing type field.\ntimestamp: 2026-06-10\nstatus: draft\n---\n# No Type\n",
+      "utf8"
+    );
+
+    const result = await execaNode(["dist/cli/index.js", "lint", "--root", root], fixedEnv(), false);
+
+    expect(result.exitCode).toBe(3);
+    expect(result.stdout).toContain("InvalidFrontmatterError wiki/topics/no-type.md");
+    expect(result.stdout).toContain("OkfConformanceError wiki/topics/no-type.md");
+    expect(result.stdout).toContain("OKF concept page requires string frontmatter field: type");
+  });
+
+  it("lint reports OKF log and reserved index violations", async () => {
+    const root = await tempRoot("llm-wiki-okf-reserved-");
+    await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--quiet"], fixedEnv());
+    await mkdir(path.join(root, "wiki/topics"), { recursive: true });
+    await writeFile(path.join(root, "wiki/log.md"), "---\ntype: log\n---\n# Wiki Log\n\n## Bad Date\n\n- Entry.\n", "utf8");
+    await writeFile(path.join(root, "wiki/topics/index.md"), "---\ntype: topic\n---\n# Topic Index\n", "utf8");
+
+    const result = await execaNode(["dist/cli/index.js", "lint", "--root", root], fixedEnv(), false);
+
+    expect(result.exitCode).toBe(39);
+    expect(result.stdout).toContain("OkfConformanceError wiki/log.md: OKF log.md must not have frontmatter");
+    expect(result.stdout).toContain("OkfConformanceError wiki/log.md: OKF log heading must use ## YYYY-MM-DD: ## Bad Date");
+    expect(result.stdout).toContain("OkfConformanceError wiki/topics/index.md: Reserved nested index.md/log.md files must not use concept frontmatter");
+  });
+
+  it("status --json reports non-string OKF version as compact failure", async () => {
+    const root = await tempRoot("llm-wiki-okf-bad-version-");
+    await execaNode(["dist/cli/index.js", "init", "--root", root, "--host", "codex", "--quiet"], fixedEnv());
+    const index = await readFile(path.join(root, "wiki/index.md"), "utf8");
+    await writeFile(path.join(root, "wiki/index.md"), index.replace('okf_version: "0.1"', "okf_version: [0.1]"), "utf8");
+
+    const status = await execaNode(["dist/cli/index.js", "status", "--root", root, "--json"], fixedEnv());
+    const parsed = JSON.parse(status.stdout);
+
+    expect(parsed.status).toBe("fail");
+    expect(parsed.okf).toMatchObject({ status: "fail", issueCount: 1 });
+    expect(parsed.okf.issues).toBeUndefined();
   });
 
   it("status fails for a missing Obsidian generated file when integration is enabled", async () => {

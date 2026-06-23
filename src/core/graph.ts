@@ -1,6 +1,7 @@
 import path from "node:path";
 import { readText, listMarkdownFiles, stableJson, atomicWriteText } from "./fs.js";
 import { extractFrontmatter, extractWikilinks, frontmatterArray, pageIdFromPath, slugify, titleFromPath } from "./markdown.js";
+import { isOkfReservedFile } from "./okf.js";
 import type { GraphEdge, WikiGraph, WikiPage } from "./types.js";
 
 export const PACKAGE_VERSION = "1.2.1";
@@ -61,6 +62,7 @@ export function buildGraph(pages: WikiPage[]): WikiGraph {
 }
 
 export function isGraphNodePage(page: WikiPage): boolean {
+  if (isOkfReservedFile(page)) return false;
   const type = stringField(page.frontmatter.type, "");
   if (["index", "log", "overview", "template"].includes(type)) return false;
   if (page.id.startsWith("templates/")) return false;

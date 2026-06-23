@@ -150,6 +150,7 @@ export interface ValidationIssue {
   code:
     | "VaultNotFoundError"
     | "InvalidFrontmatterError"
+    | "OkfConformanceError"
     | "BrokenLinkError"
     | "GraphDriftError"
     | "ImmutableRawViolationError"
@@ -158,6 +159,19 @@ export interface ValidationIssue {
   severity: "error" | "warning";
   path?: string;
   message: string;
+}
+
+export interface OkfConformanceSummary {
+  version: "0.1";
+  status: "pass" | "fail";
+  pageCount: number;
+  conceptPageCount: number;
+  reservedFileCount: number;
+  issueCount: number;
+}
+
+export interface OkfConformanceReport extends OkfConformanceSummary {
+  issues: ValidationIssue[];
 }
 
 export interface HealthReport {
@@ -181,4 +195,5 @@ export interface StatusReport {
   missingFiles: string[];
   extraManifestFiles: string[];
   missingManifestFiles: string[];
+  okf: OkfConformanceSummary;
 }

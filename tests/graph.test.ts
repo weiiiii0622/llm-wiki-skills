@@ -42,7 +42,35 @@ describe("graph", () => {
     const pages = await loadWikiPages(root);
     expect(pages.some((page) => page.id === "graph")).toBe(false);
   });
+
+  it("excludes root and nested OKF reserved files from graph nodes", () => {
+    const pages = [
+      page("index", "wiki/index.md", { okf_version: "0.1", type: "index" }),
+      page("log", "wiki/log.md", {}),
+      page("topics/index", "wiki/topics/index.md", {}),
+      page("topics/log", "wiki/topics/log.md", {}),
+      page("topics/concept", "wiki/topics/concept.md", { type: "topic", status: "draft" })
+    ];
+
+    const graph = buildGraph(pages);
+
+    expect(graph.nodes.map((node) => node.id)).toEqual(["topics/concept"]);
+  });
 });
+
+function page(id: string, filePath: string, frontmatter: Record<string, unknown>) {
+  return {
+    id,
+    path: filePath,
+    title: id,
+    slug: id,
+    frontmatter,
+    body: "",
+    wikilinks: [],
+    sources: [],
+    tags: []
+  };
+}
 
 async function copyDemoVault(): Promise<string> {
   const root = await mkdtemp(path.join(os.tmpdir(), "llm-wiki-demo-"));

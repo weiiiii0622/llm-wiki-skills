@@ -16,6 +16,7 @@
   <a href="https://github.com/weiiiii0622/llm-wiki-skills/actions/workflows/release.yml"><img src="https://img.shields.io/github/actions/workflow/status/weiiiii0622/llm-wiki-skills/release.yml?style=flat-square&logo=githubactions&label=release" alt="release status"></a>
   <img src="https://img.shields.io/node/v/llm-wiki-skills?style=flat-square&logo=nodedotjs" alt="Node.js version">
   <img src="https://img.shields.io/badge/Obsidian-compatible-7c3aed?style=flat-square&logo=obsidian" alt="Obsidian compatible">
+  <img src="https://img.shields.io/badge/OKF-compatible-4285f4?style=flat-square&logo=google&logoColor=white" alt="OKF compatible">
   <a href="https://github.com/weiiiii0622/llm-wiki-skills/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/llm-wiki-skills?color=0f766e" alt="license"></a>
 </p>
 
@@ -38,6 +39,7 @@ AI agents are useful until they forget the context you gave them last week. `llm
 - 🤖 **Agent-native:** installs skills for Codex and Claude Code, not just docs for humans.
 - 🏠 **Local-first:** no hosted memory service, no remote database, no required account.
 - 📎 **Source-grounded:** raw evidence and synthesized wiki pages stay separate.
+- 📦 **OKF-compatible:** new vaults are OKF v0.1 bundles with a root index, log, and concept-page metadata.
 - 🧩 **Custom-format markdown conversion:** convert PDF, DOCX, PPTX, XLSX, XLS, HTML, HTM, EPUB, PNG, JPG, JPEG, WEBP, TIF, TIFF, and BMP files into markdown during ingest planning when Marker is installed.
 - 🗂️ **Topic-aware:** choose a scaffold for research, product work, trips, investing, medical notes, legal/admin records, and more.
 - 🌐 **Web-only graph atlas:** visualize, search, and read your wiki in a browser. Obsidian is optional, not required.

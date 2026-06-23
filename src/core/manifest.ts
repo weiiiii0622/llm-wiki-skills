@@ -3,7 +3,9 @@ import { readFile } from "node:fs/promises";
 import { ManifestMismatchError, RequiredFileMissingError } from "./errors.js";
 import { atomicWriteText, pathExists, stableJson } from "./fs.js";
 import { getHostAdapters } from "./hosts.js";
+import { loadWikiPages } from "./graph.js";
 import { obsidianGeneratedFilePaths, obsidianIntegrationMetadata } from "./obsidian.js";
+import { buildOkfConformance } from "./okf.js";
 import { QMD_MODEL_CACHE_PATH, QMD_MODELS, qmdGeneratedFilePaths } from "./qmd-metadata.js";
 import { isTopicSelectionId, isTopicTemplateId } from "./topic-templates.js";
 import { REQUIRED_DIRECTORIES, sharedReferenceFilePaths, starterFilePaths } from "./vault-contract.js";
@@ -79,8 +81,10 @@ export async function buildStatusReport(root: string): Promise<StatusReport> {
     throw new RequiredFileMissingError(`Required file missing: ${missingFiles.join(", ")}`);
   }
 
+  const { issues: _issues, ...okf } = buildOkfConformance(await loadWikiPages(root));
+
   return {
-    status: "pass",
+    status: okf.status,
     root,
     manifestPath: MANIFEST_PATH,
     hosts: manifest.hosts,
@@ -89,7 +93,8 @@ export async function buildStatusReport(root: string): Promise<StatusReport> {
     checkedFiles: manifestFiles,
     missingFiles,
     extraManifestFiles,
-    missingManifestFiles
+    missingManifestFiles,
+    okf
   };
 }
 

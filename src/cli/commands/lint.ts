@@ -1,6 +1,6 @@
 import path from "node:path";
 import { assertVault } from "../../core/vault-contract.js";
-import { BrokenLinkError, InvalidFrontmatterError } from "../../core/errors.js";
+import { BrokenLinkError, InvalidFrontmatterError, OkfConformanceError } from "../../core/errors.js";
 import { renderLintReport } from "../../core/reports.js";
 import { validateVault } from "../../core/validators.js";
 import type { CommandOptions } from "../../core/types.js";
@@ -15,4 +15,5 @@ export async function lintCommand(options: CommandOptions): Promise<void> {
   if (!firstError) return;
   if (firstError.code === "BrokenLinkError") throw new BrokenLinkError(firstError.message);
   if (firstError.code === "InvalidFrontmatterError") throw new InvalidFrontmatterError(firstError.message);
+  if (firstError.code === "OkfConformanceError") throw new OkfConformanceError(firstError.message);
 }

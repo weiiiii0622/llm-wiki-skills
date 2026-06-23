@@ -1,5 +1,8 @@
 ---
 type: source
+title: Package Plan
+description: Source summary for the package plan.
+timestamp: 2026-06-10
 status: reviewed
 created: 2026-06-10
 updated: 2026-06-10

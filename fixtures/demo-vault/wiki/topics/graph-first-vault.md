@@ -1,5 +1,8 @@
 ---
 type: topic
+title: Graph First Vault
+description: Concept page describing graph-first LLM wiki behavior.
+timestamp: 2026-06-10
 status: draft
 created: 2026-06-10
 updated: 2026-06-10

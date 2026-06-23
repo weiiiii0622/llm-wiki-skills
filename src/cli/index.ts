@@ -5,12 +5,13 @@ import { initCommand } from "./commands/init.js";
 import { qmdCommand } from "./commands/qmd.js";
 import { ingestCommand } from "./commands/ingest.js";
 import { webCommand } from "./commands/web.js";
+import { lintCommand } from "./commands/lint.js";
 import { statusCommand } from "./commands/status.js";
 import { ConflictingObsidianOptionError, ConflictingQmdOptionError, LlmWikiError } from "../core/errors.js";
 import { parseHostValues } from "../core/hosts.js";
 import type { CommandOptions } from "../core/types.js";
 
-const COMMANDS = new Set(["init", "status", "qmd", "ingest", "web"]);
+const COMMANDS = new Set(["init", "status", "lint", "qmd", "ingest", "web"]);
 
 async function main(argv: string[]): Promise<void> {
   const { command, options } = parseCommand(argv);
@@ -20,6 +21,9 @@ async function main(argv: string[]): Promise<void> {
       return;
     case "status":
       await statusCommand(options);
+      return;
+    case "lint":
+      await lintCommand(options);
       return;
     case "qmd":
       await qmdCommand(options);
@@ -47,7 +51,7 @@ export function parseCommand(argv: string[]): { command: string; options: Comman
   if (command === "qmd") return { command, options: parseQmdOptions(args) };
   if (command === "ingest") return { command, options: parseIngestOptions(args) };
   if (command === "web") return { command, options: parseWebOptions(args) };
-  if (command === "status") return { command, options: parseStatusOptions(args) };
+  if (command === "status" || command === "lint") return { command, options: parseStatusOptions(args) };
   return { command, options: parseInitOptions(args) };
 }
 
@@ -304,6 +308,7 @@ health-check the wiki over time.
 Usage:
   llm-wiki-skills init [--root DIR] [--host codex|claude-code] [--topic ID] [--obsidian|--no-obsidian] [--qmd|--no-qmd] [--json] [--quiet]
   llm-wiki-skills status [--root DIR] [--json] [--quiet]
+  llm-wiki-skills lint [--root DIR] [--json] [--quiet]
   llm-wiki-skills qmd enable|disable|status|reindex [--root DIR] [--json] [--quiet]
   llm-wiki-skills web build --root DIR --out DIR [--json] [--quiet]
   llm-wiki-skills web serve --root DIR [--port PORT] [--out DIR] [--json] [--quiet]  # default port: 3678

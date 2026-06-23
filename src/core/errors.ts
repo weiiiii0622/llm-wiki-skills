@@ -3,6 +3,7 @@ export class LlmWikiError extends Error {
     public readonly code:
       | "VaultNotFoundError"
       | "InvalidFrontmatterError"
+      | "OkfConformanceError"
       | "BrokenLinkError"
       | "GraphDriftError"
       | "ImmutableRawViolationError"
@@ -55,6 +56,12 @@ export class VaultNotFoundError extends LlmWikiError {
 export class InvalidFrontmatterError extends LlmWikiError {
   constructor(message: string) {
     super("InvalidFrontmatterError", message, 3);
+  }
+}
+
+export class OkfConformanceError extends LlmWikiError {
+  constructor(message: string) {
+    super("OkfConformanceError", message, 39);
   }
 }
 
